@@ -292,3 +292,85 @@ def test_safety_journey_consent_gates_a_verifiable_pack(api):
     # Withdrawn consent stops new packs.
     c.post("/demo/safety/sam/consent", json={"sender": "riley", "grant": False})
     assert c.post(f"/v1/cases/{case_id}/evidence-pack").status_code == 403
+
+
+# -- security ---------------------------------------------------------------------------
+BILLION_LAUGHS = b'''<?xml version="1.0"?><!DOCTYPE lolz [<!ENTITY lol "lol"><!ENTITY lol2 "&lol;&lol;&lol;&lol;">]>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><x>&lol2;</x></Document>'''
+EXTERNAL_ENTITY = b'''<?xml version="1.0"?><!DOCTYPE d [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><d>&xxe;</d>'''
+
+
+@pytest.mark.parametrize("payload", [BILLION_LAUGHS, EXTERNAL_ENTITY, b"<a>" + b"x" * 1_000_001 + b"</a>"],
+                         ids=["billion-laughs", "external-entity", "oversized"])
+def test_parser_refuses_dtds_entities_and_huge_messages(payload):
+    with pytest.raises(iso20022.UnsafeMessage):
+        iso20022.parse(payload)
+
+
+def test_rate_limiter_counts_per_client_and_route():
+    from safepay.app.security import RateLimiter
+    rl = RateLimiter()
+    assert all(rl.allow("a", "/demo/reset", public=True)[0] for _ in range(6))
+    ok, retry = rl.allow("a", "/demo/reset", public=True)
+    assert not ok and retry > 0
+    assert rl.allow("b", "/demo/reset", public=True)[0]          # another client is unaffected
+
+
+@pytest.fixture(autouse=True)
+def _fresh_rate_limits():
+    import sys
+    sec = sys.modules.get("safepay.app.security")
+    if sec:
+        sec.limiter.reset()
+    yield
+
+
+@pytest.fixture
+def secure(api):
+    """Temporarily change the security settings of the running app."""
+    from safepay.app import security
+    saved = dict(vars(security.settings))
+    yield security.settings
+    vars(security.settings).update(saved)
+
+
+@needs_models
+def test_production_mode_locks_down_the_service(api, secure):
+    api.post("/demo/reset")
+    case_id = api.post("/demo/script/coercive").json()["last"]["case_id"]
+    secure.mode, secure.api_keys, secure.analyst_tokens = "production", ["bank-key"], {"tok-1": "analyst-1"}
+    assert api.get("/").status_code == 404 and api.post("/demo/reset").status_code == 404
+    xml = iso20022.build_pacs008(iso20022.new_payment("A", "1", "B", "2", 20.0, "rent"))
+    assert api.post("/v1/screen", content=xml).status_code == 401
+    assert api.post("/v1/screen", content=xml, headers={"X-API-Key": "wrong"}).status_code == 401
+    assert api.post("/v1/screen", content=xml, headers={"X-API-Key": "bank-key"}).status_code == 200
+    assert api.get("/v1/cases").status_code == 401
+    # The audit log names the token's owner, whatever the request claims.
+    r = api.get(f"/v1/cases/{case_id}", headers={"X-Analyst-Token": "tok-1", "X-Analyst": "mallory"})
+    assert r.status_code == 200
+    log = api.get("/v1/audit", headers={"X-Analyst-Token": "tok-1"}).json()
+    assert log[0]["actor"] == "analyst-1" and all(e["actor"] != "mallory" for e in log)
+    # Police and courts can still verify packs without an account.
+    assert api.post("/v1/packs/verify", json={}).status_code == 200
+
+
+@needs_models
+def test_public_demo_needs_the_password_and_sends_security_headers(api, secure):
+    secure.demo_password = "s3cret-demo"
+    r = api.get("/")
+    assert r.status_code == 401 and "Basic" in r.headers["www-authenticate"]
+    assert api.get("/", auth=("judge", "wrong")).status_code == 401
+    ok = api.get("/", auth=("judge", "s3cret-demo"))
+    assert ok.status_code == 200 and ok.headers["x-frame-options"] == "DENY"
+    assert "frame-ancestors 'none'" in ok.headers["content-security-policy"]
+    assert api.get("/healthz").status_code == 200                      # health checks stay open
+    for _ in range(6):
+        assert api.post("/demo/reset", auth=("judge", "s3cret-demo")).status_code == 200
+    assert api.post("/demo/reset", auth=("judge", "s3cret-demo")).status_code == 429
+
+
+@needs_models
+def test_screen_endpoint_refuses_attack_xml(api):
+    assert api.post("/v1/screen", content=BILLION_LAUGHS).status_code == 400
+    big = b"<a>" + b"x" * 1_100_000 + b"</a>"
+    assert api.post("/v1/screen", content=big).status_code == 413

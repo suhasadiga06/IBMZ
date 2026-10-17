@@ -52,3 +52,4 @@ The same script, formatted for reading while you record, is in `pitch/SafePay_re
 - [ ] Lab container stopped before recording, and the Granite brief present on case #2 before scene 5
 - [ ] Terminal font large enough to read
 - [ ] Project title `Suhas Adiga_IBM Z Datathon 2026 Project`, and "SSF2026" in the description
+- [ ] Live demo running (`bash run_safepay.sh public`), port 8090 open, and http://148.100.76.164:8090 opens from your own browser; the login (user `judge` and the password) goes in the description

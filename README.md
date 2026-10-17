@@ -232,6 +232,27 @@ Threats are rare and hard to pin down from text alone. That's exactly why the re
 - **Containerised.** The `Containerfile` builds an s390x image with Podman.
 - **Granite stays off the payment path.** At 1.3 tokens/s on 3 shared cores, a brief takes 1–2 minutes, so Granite runs in a background queue, and is re-run when a case escalates to P1.
 
+## Security
+
+| Threat | What SafePay does |
+|---|---|
+| Malicious XML (entity expansion, external entities) | ISO 20022 never needs a DTD, so any message with a `<!DOCTYPE` or `<!ENTITY` is refused before parsing. Messages over 1 MB or 1,000 transactions are refused too |
+| Anyone calling the bank-facing API | `SAFEPAY_MODE=production` requires an API key (`X-API-Key`) for screening, pre-send checks and recipient choices, compared in constant time |
+| A forged identity in the audit log | In production, the analyst's name comes from their personal token (`X-Analyst-Token`), never from a header the caller sets. A test checks that a request claiming to be "mallory" is logged under the token's owner |
+| The demo left on in production | Production mode removes every demo page and `/demo` endpoint (404), plus the API docs |
+| Floods and expensive requests | Rate limits per client and route (e.g. 6 resets or 20 scenario replays a minute), and a cap of 4 queued Granite briefs; more are refused with 429, not queued |
+| Clickjacking and content injection | Content Security Policy, `X-Frame-Options: DENY`, `nosniff`, `no-referrer`, and no caching. Everything the pages show from the API is set with `textContent`, never as HTML |
+| Data at rest | Message text, relationship state and victim preferences encrypted with AES-256-GCM; account numbers replaced by HMAC tokens; evidence hash-chained; packs signed with Ed25519 |
+| Secrets | Keys, tokens and the demo password live in `~/.safepay/` (mode 600), outside the repository, created by `python3 -m safepay.scripts.make_keys`. Granite only listens on 127.0.0.1 |
+
+Pack verification (`/v1/packs/verify`, `/v1/evidence/public-key`) stays open in every mode, so police and courts can check a pack without an account. The tests cover each row above.
+
+### Live demo
+
+`bash run_safepay.sh public` serves the demo on port 8090 behind a password (user `judge`), with the stricter public rate limits. The password is in `~/.safepay/demo_password` on the VM. The VM's firewall only allows SSH by default, so the port has to be opened separately.
+
+**Link: http://148.100.76.164:8090** (user `judge`; the password is in the submission). The analyst console is at `/analyst` and the evidence page at `/system`. The demo runs over plain HTTP, so the demo password is the only secret that crosses the network, and the demo holds only fictional data.
+
 ## What is real and what is simulated
 
 | Real | Simulated (and why) |
@@ -260,6 +281,8 @@ ssh -N -L 8090:127.0.0.1:8090 linux1@<vm-ip>
 Then open http://localhost:8090 (live demo, with five scenarios including **Hidden, then switches account**; the recipient's **Message settings** tab is the victim's side), `/analyst` (specialist console, where a case with consent offers **Prepare signed evidence pack**), `/pack/{id}` (the printable pack, with Verify and Simulate tampering), and `/system` (every number above, read from the training and benchmark outputs).
 
 Container: `podman build -t safepay -f Containerfile . && bash run_safepay.sh container`
+
+Modes: `bash run_safepay.sh` (local demo), `bash run_safepay.sh public` (password-protected public demo), `bash run_safepay.sh production` (no demo; API keys and analyst tokens required).
 
 Tests: `python3 -m pytest -q tests_safepay` (24 tests; the two end-to-end ones need trained models). They cover the hash chain catching edits and deletions, pack signatures rejecting a one-character change or another key, consent gating and withdrawal, and that no message text or preference is readable in the database.
 

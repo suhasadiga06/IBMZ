@@ -59,9 +59,33 @@ def _text(parent: ET.Element | None, path: str, ns: str, default: str = "") -> s
     return node.text.strip() if node is not None and node.text else default
 
 
+MAX_MESSAGE_BYTES = 1_000_000
+MAX_TRANSACTIONS = 1_000
+_FORBIDDEN = (b"<!doctype", b"<!entity")
+
+
+class UnsafeMessage(ValueError):
+    """A message refused before parsing, because it could attack the parser."""
+
+
+def check_safe(raw: bytes) -> None:
+    """ISO 20022 messages never need a DTD. Refusing DTDs and entity declarations
+    shuts out entity-expansion ("billion laughs") and external-entity attacks
+    on the XML parser, whatever the parser version."""
+    if len(raw) > MAX_MESSAGE_BYTES:
+        raise UnsafeMessage(f"message larger than {MAX_MESSAGE_BYTES:,} bytes")
+    head = raw.lower()
+    if any(tok in head for tok in _FORBIDDEN):
+        raise UnsafeMessage("DTDs and entity declarations are not allowed in ISO 20022 messages")
+
+
 def parse(xml: str | bytes) -> list[Payment]:
     """Parse a pacs.008 or pain.001 document into one Payment per transaction."""
-    root = ET.fromstring(xml)
+    raw = xml.encode("utf-8") if isinstance(xml, str) else xml
+    check_safe(raw)
+    if raw.count(b"CdtTrfTxInf") > 2 * MAX_TRANSACTIONS:
+        raise UnsafeMessage(f"more than {MAX_TRANSACTIONS:,} transactions in one message")
+    root = ET.fromstring(raw)
     ns = root.tag[1:].split("}")[0] if root.tag.startswith("{") else ""
     kind = next((k for k, v in NS.items() if v == ns), None)
     if kind is None:

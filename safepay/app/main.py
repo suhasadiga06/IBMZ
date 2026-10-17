@@ -18,7 +18,7 @@ from pathlib import Path
 
 import joblib
 import numpy as np
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -28,6 +28,8 @@ from safepay.core.privacy import Privacy
 from safepay.core.screener import Screener
 from safepay.core.state import FEATURES
 from safepay.core.store import Store
+from safepay.app import security
+from safepay.app.security import analyst, require_bank
 
 ROOT = Path(__file__).resolve().parents[2]
 ART, STATIC = ROOT / "artifacts", Path(__file__).parent / "static"
@@ -47,7 +49,10 @@ rel_bundle["version"] = f"text+rel/{rel_bundle['kind']}/{time.strftime('%Y%m%d',
 store = Store(DB)
 privacy = Privacy()
 SIGN_KEY = evidence_pack.signing_key()
-app = FastAPI(title="SafePay", version="1.0")
+app = FastAPI(title="SafePay", version="1.0", docs_url=None if security.settings.production else "/docs",
+              redoc_url=None, openapi_url=None if security.settings.production else "/openapi.json")
+app.middleware("http")(security.middleware)
+GRANITE_QUEUE_MAX = 4      # background briefs waiting at most; more requests are refused, not queued
 
 STATS = {"screened": 0, "hidden": 0, "cases_opened": 0, "nudges": 0}
 LAT = deque(maxlen=5000)
@@ -87,14 +92,14 @@ AUTO_GRANITE: set[str] = set()      # recipient tokens whose new cases get Grani
 def on_new_case(case_id: int) -> None:
     STATS["cases_opened"] += 1
     c = store.case(case_id)
-    if c and c["recipient"] in AUTO_GRANITE:
+    if c and c["recipient"] in AUTO_GRANITE and worker.q.qsize() < GRANITE_QUEUE_MAX:
         worker.submit((case_id,))
 
 
 def on_escalate(case_id: int) -> None:
     """New severe evidence (a threat): the earlier brief is out of date, write a new one."""
     c = store.case(case_id)
-    if c and c["recipient"] in AUTO_GRANITE:
+    if c and c["recipient"] in AUTO_GRANITE and worker.q.qsize() < GRANITE_QUEUE_MAX:
         worker.submit((case_id,))
 
 
@@ -114,13 +119,16 @@ def healthz() -> dict:
     return {"ok": True, "model_version": screener.model_version, "tree_format": TREE_FORMAT}
 
 
-@app.post("/v1/screen")
+@app.post("/v1/screen", dependencies=[Depends(require_bank)])
 async def screen(request: Request) -> dict:
     """Body: an ISO 20022 pacs.008 or pain.001 document. Returns one decision per transaction."""
+    body = await request.body()
     try:
-        payments = iso20022.parse(await request.body())
-    except Exception as e:
-        raise HTTPException(400, f"not a supported ISO 20022 message: {e}")
+        payments = iso20022.parse(body)
+    except iso20022.UnsafeMessage as e:
+        raise HTTPException(413 if "larger" in str(e) else 400, str(e))
+    except Exception:
+        raise HTTPException(400, "not a supported ISO 20022 message (pacs.008 or pain.001)")
     return {"results": [record(screener.screen(p)) for p in payments]}
 
 
@@ -131,7 +139,7 @@ class PreSubmit(BaseModel):
     reference: str = Field("", max_length=140)
 
 
-@app.post("/v1/presubmit")
+@app.post("/v1/presubmit", dependencies=[Depends(require_bank)])
 def presubmit(body: PreSubmit) -> dict:
     """Sender's bank, before the customer presses send. Never reveals that a case exists."""
     p = iso20022.new_payment("", body.sender_account, "", body.recipient_account, body.amount, body.reference)
@@ -147,7 +155,7 @@ class Hide(BaseModel):
     sender_account: str
 
 
-@app.post("/v1/recipients/hide")
+@app.post("/v1/recipients/hide", dependencies=[Depends(require_bank)])
 def hide(body: Hide) -> dict:
     screener.hide_sender(body.recipient_account, body.sender_account)
     return {"ok": True}
@@ -179,7 +187,7 @@ class PrefsIn(SafetyPrefs):
     recipient_account: str
 
 
-@app.post("/v1/recipients/preferences")
+@app.post("/v1/recipients/preferences", dependencies=[Depends(require_bank)])
 def set_preferences(body: PrefsIn) -> dict:
     save_prefs(privacy.token(body.recipient_account), SafetyPrefs(**body.model_dump(exclude={"recipient_account"})))
     return {"ok": True}
@@ -202,7 +210,7 @@ def set_consent(recipient_token: str, sender_token: str, purpose: str, grant: bo
     return {"ok": True}
 
 
-@app.post("/v1/recipients/consent")
+@app.post("/v1/recipients/consent", dependencies=[Depends(require_bank)])
 def consent(body: ConsentIn) -> dict:
     return set_consent(privacy.token(body.recipient_account), privacy.token(body.sender_account), body.purpose, body.grant)
 
@@ -215,13 +223,13 @@ def _case_view(c: dict) -> dict:
     return c
 
 
-@app.get("/v1/cases")
+@app.get("/v1/cases", dependencies=[Depends(analyst)])
 def cases(status: str | None = None) -> list[dict]:
     return [_case_view(c) for c in store.cases(status)]
 
 
 @app.get("/v1/cases/{case_id}")
-def case(case_id: int, x_analyst: str = Header("analyst-demo")) -> dict:
+def case(case_id: int, x_analyst: str = Depends(analyst)) -> dict:
     c = store.case(case_id)
     if not c:
         raise HTTPException(404)
@@ -244,7 +252,7 @@ class Label(BaseModel):
 
 
 @app.post("/v1/cases/{case_id}/label")
-def label(case_id: int, body: Label, x_analyst: str = Header("analyst-demo")) -> dict:
+def label(case_id: int, body: Label, x_analyst: str = Depends(analyst)) -> dict:
     c = store.case(case_id)
     if not c:
         raise HTTPException(404)
@@ -255,16 +263,18 @@ def label(case_id: int, body: Label, x_analyst: str = Header("analyst-demo")) ->
     return {"ok": True, "labels_for_retraining": store.q("SELECT COUNT(*) n FROM labels")[0]["n"]}
 
 
-@app.post("/v1/cases/{case_id}/granite")
+@app.post("/v1/cases/{case_id}/granite", dependencies=[Depends(analyst)])
 def ask_granite(case_id: int) -> dict:
     if not store.case(case_id):
         raise HTTPException(404)
+    if worker.q.qsize() >= GRANITE_QUEUE_MAX:
+        raise HTTPException(429, "Granite is busy with other cases; try again in a few minutes.")
     worker.submit((case_id,))
     return {"queued": True, "queue_length": worker.q.qsize()}
 
 
 @app.post("/v1/cases/{case_id}/evidence-pack")
-def make_pack(case_id: int, x_analyst: str = Header("analyst-demo")) -> dict:
+def make_pack(case_id: int, x_analyst: str = Depends(analyst)) -> dict:
     c = store.case(case_id)
     if not c:
         raise HTTPException(404)
@@ -287,7 +297,7 @@ def make_pack(case_id: int, x_analyst: str = Header("analyst-demo")) -> dict:
 
 
 @app.get("/v1/packs/{pack_id}")
-def get_pack(pack_id: int, x_analyst: str = Header("analyst-demo")) -> dict:
+def get_pack(pack_id: int, x_analyst: str = Depends(analyst)) -> dict:
     p = store.pack(pack_id)
     if not p:
         raise HTTPException(404)
@@ -315,7 +325,7 @@ async def verify_pack(request: Request) -> dict:
     return out
 
 
-@app.get("/v1/audit")
+@app.get("/v1/audit", dependencies=[Depends(analyst)])
 def audit() -> list[dict]:
     return store.audit_log()
 
@@ -356,7 +366,7 @@ def model_metrics() -> dict:
     return out
 
 
-@app.get("/metrics", response_class=PlainTextResponse)
+@app.get("/metrics", response_class=PlainTextResponse, dependencies=[Depends(require_bank)])
 def prometheus() -> str:
     s = system()["live"]
     return "\n".join([f"safepay_payments_screened_total {STATS['screened']}",
