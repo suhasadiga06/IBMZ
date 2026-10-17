@@ -247,7 +247,7 @@ def system() -> dict:
 @app.get("/api/model-metrics")
 def model_metrics() -> dict:
     out = {}
-    for name in ("metrics_text", "metrics_text_unmasked", "metrics_rel", "benchmark"):
+    for name in ("metrics_text", "metrics_text_unmasked", "metrics_rel", "benchmark", "cba_validation"):
         f = ART / f"{name}.json"
         out[name] = json.loads(f.read_text()) if f.exists() else None
     return out
