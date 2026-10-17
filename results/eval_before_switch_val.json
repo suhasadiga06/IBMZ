@@ -1,0 +1,111 @@
+{
+  "tag": "before_switch_val",
+  "model": "rel.joblib",
+  "model_features": 23,
+  "seed": 2,
+  "chunks": 1,
+  "totals": {
+    "relationships": 5064,
+    "payments": 33270,
+    "abusive": 331,
+    "caught": 319,
+    "innocent": 4733,
+    "false_alarms": 9,
+    "innocent_messages": 24717,
+    "innocent_hidden": 564,
+    "abusive_messages": 6339,
+    "abusive_hidden": 5903
+  },
+  "false_alarm_rate": 0.0019015423621381788,
+  "false_alarm_rate_95ci": [
+    0.0008698633531656932,
+    0.003606637112876671
+  ],
+  "innocent_messages_hidden_share": 0.02281830319213497,
+  "false_alarms_by_kind": {
+    "friends": 9
+  },
+  "flag_rate_by_kind": {
+    "abusive_child_support": 0.9091,
+    "account_switch": 0.9032,
+    "account_switch_first": 1.0,
+    "account_switch_first_reverse": 0.0,
+    "account_switch_reverse": 0.0,
+    "account_verification": 0.0,
+    "child_support": 0.0,
+    "coercive_control": 1.0,
+    "coercive_control_reverse": 0.0,
+    "couple_or_family": 0.0,
+    "debt_reminder": 0.0,
+    "friends": 0.0054,
+    "harassment": 1.0,
+    "harassment_reverse": 0.0,
+    "low_and_slow": 0.825,
+    "low_and_slow_reverse": 0.0,
+    "marketplace": 0.0,
+    "night_shift_friends": 0.0,
+    "parent_allowance": 0.0,
+    "rent": 0.0,
+    "split_threat": 1.0,
+    "split_threat_reverse": 0.0
+  },
+  "seconds": 28.9,
+  "evaluation": {
+    "precision": 0.9726,
+    "recall": 0.9637,
+    "f1": 0.9681,
+    "abusive_relationships": 331,
+    "caught": 319,
+    "innocent_relationships": 4733,
+    "false_alarms": 9,
+    "false_alarms_per_10k_innocent": 19.0,
+    "delay_hours_median": 75.6,
+    "delay_hours_p90": 362.2,
+    "caught_within_24h_share": 0.2356,
+    "flag_rate_by_kind": {
+      "abusive_child_support": 0.9091,
+      "account_switch": 0.9032,
+      "account_switch_first": 1.0,
+      "account_switch_first_reverse": 0.0,
+      "account_switch_reverse": 0.0,
+      "account_verification": 0.0,
+      "child_support": 0.0,
+      "coercive_control": 1.0,
+      "coercive_control_reverse": 0.0,
+      "couple_or_family": 0.0,
+      "debt_reminder": 0.0,
+      "friends": 0.0054,
+      "harassment": 1.0,
+      "harassment_reverse": 0.0,
+      "low_and_slow": 0.825,
+      "low_and_slow_reverse": 0.0,
+      "marketplace": 0.0,
+      "night_shift_friends": 0.0,
+      "parent_allowance": 0.0,
+      "rent": 0.0,
+      "split_threat": 1.0,
+      "split_threat_reverse": 0.0
+    },
+    "messages": {
+      "abusive_messages": 6339,
+      "abusive_hidden_share": 0.9312,
+      "innocent_messages": 24717,
+      "innocent_hidden_share": 0.0228
+    }
+  },
+  "recall_used": 0.9637462235649547,
+  "precision_at_prevalence": {
+    "1 in 100": {
+      "measured": 0.8366,
+      "worst_case_95": 0.7297
+    },
+    "1 in 1,000": {
+      "measured": 0.3366,
+      "worst_case_95": 0.211
+    },
+    "1 in 10,000": {
+      "measured": 0.0482,
+      "worst_case_95": 0.026
+    }
+  }
+}

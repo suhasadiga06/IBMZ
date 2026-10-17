@@ -129,7 +129,7 @@ class PairState:
         return cls(**json.loads(s))
 
 
-FEATURES = [
+PAIR_FEATURES = [
     "log_payments", "days_active", "payments_per_day",
     "share_penny_payments", "share_night", "share_with_message", "reply_ratio",
     "harm_max", "harm_mean", "share_harmful", "threat_max", "harm_recent_ewm",
@@ -137,6 +137,12 @@ FEATURES = [
     "payments_last_7d", "frequency_trend", "recipient_hid_sender", "log_contact_after_hide",
     "log_amount_mean", "amount_cv", "log_harmful_messages",
 ]
+# Context from the recipient's side, so an abuser who switches to a new account
+# after being hidden is not a stranger with a clean slate (computed by Engine).
+RECIPIENT_FEATURES = ["recipient_hid_another_sender", "days_from_that_hide_to_first_contact",
+                      "new_senders_since_that_hide"]
+FEATURES = PAIR_FEATURES + RECIPIENT_FEATURES
+NO_HIDE_DAYS = 60.0
 
 
 def hour_of(dt: datetime) -> int:

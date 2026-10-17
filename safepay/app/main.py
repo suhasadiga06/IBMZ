@@ -41,7 +41,7 @@ def _measured_fastest() -> str | None:
     return json.loads(f.read_text()).get("fastest_tree_format") if f.exists() else None
 
 
-TREE_FORMAT = relmodel.optimise(rel_bundle["model"], np.zeros((256, len(FEATURES)), dtype=np.float32),
+TREE_FORMAT = relmodel.optimise(rel_bundle["model"], np.zeros((256, len(rel_bundle.get("features", FEATURES))), dtype=np.float32),
                                 os.environ.get("SAFEPAY_TREE_FORMAT") or _measured_fastest())
 rel_bundle["version"] = f"text+rel/{rel_bundle['kind']}/{time.strftime('%Y%m%d', time.gmtime((ART / 'rel.joblib').stat().st_mtime))}"
 store = Store(DB)
@@ -249,7 +249,8 @@ def label(case_id: int, body: Label, x_analyst: str = Header("analyst-demo")) ->
     if not c:
         raise HTTPException(404)
     st = screener.engine.states.get((c["sender"], c["recipient"]))
-    store.label(case_id, x_analyst, body.label, st.features(st.last_ts) if st else [])
+    store.label(case_id, x_analyst, body.label,
+                screener.engine.features(c["sender"], c["recipient"], st, st.last_ts) if st else [])
     store.audit(x_analyst, f"labelled_{body.label}", case_id)
     return {"ok": True, "labels_for_retraining": store.q("SELECT COUNT(*) n FROM labels")[0]["n"]}
 
@@ -347,7 +348,9 @@ def system() -> dict:
 def model_metrics() -> dict:
     out = {}
     for name in ("metrics_text", "metrics_text_unmasked", "metrics_rel", "benchmark", "cba_validation",
-                 "granite_eval_v1_seed6", "granite_eval_v2_seed6", "granite_eval_v2_seed7"):
+                 "granite_eval_v1_seed6", "granite_eval_v2_seed6", "granite_eval_v2_seed7",
+                 "eval_prevalence", "eval_test_protect", "eval_before_switch_val", "eval_before_switch_test",
+                 "metrics_rel_paironly"):
         f = ART / f"{name}.json"
         out[name] = json.loads(f.read_text()) if f.exists() else None
     return out
@@ -372,6 +375,8 @@ PEOPLE = {
     "kim": ("Kim Taylor", "064000-23981145"),
     "riley": ("Riley Morgan", "062100-38820417"),
     "chris": ("Chris Walker", "063200-90155362"),
+    "casey": ("Casey Brooks", "062400-58823190"),
+    "drew": ("Drew Kelly", "062300-41177208"),     # the account Casey switches to
 }
 INBOX: dict[str, list[dict]] = {k: [] for k in PEOPLE}
 DEMO_CLOCK = {"t": None}
@@ -490,8 +495,13 @@ SCRIPTS = {
     "child_support": ("chris", "kim", [(350, "child support"), (350, "for the kids"),
                                        (350, "you will never see them again you worthless b1tch"),
                                        (350, "child support"), (350, "unless you come back this is the last")]),
-    "friends": ("alex", "sam", [(24.5, "pizza 🍕"), (12, "you owe me loser haha"), (60, "concert tickets"),
+    "friends": ("alex", "kim", [(24.5, "pizza 🍕"), (12, "you owe me loser haha"), (60, "concert tickets"),
                                 (8, "killing it at work congrats"), (30, "dinner, you pig"), (15, "uber")]),
+    # Hidden by Sam, Casey carries on from a new account. Steps may name their own sender, or hide one.
+    "account_switch": ("casey", "sam", [(0.01, "pick up"), (0.01, "where are you"), (0.01, "answer me"),
+                                        ("hide", "casey"),
+                                        ("drew", 0.01, "new account, you can't block me"), ("drew", 0.01, "answer me"),
+                                        ("drew", 0.01, "I'm outside")]),
 }
 
 
@@ -500,11 +510,23 @@ def script(name: str) -> dict:
     if name not in SCRIPTS:
         raise HTTPException(404)
     frm, to, steps = SCRIPTS[name]
-    gap = {"split_threat": 0.5, "coercive": 37.0, "child_support": 14 * 24 * 60.0, "friends": 3 * 24 * 60.0}[name]
-    results = [demo_send(frm, to, amt, ref, step_minutes=gap) for amt, ref in steps]
-    return {"steps": [{"reference": ref, "amount": amt, "decision": r["decision"], "scores": r["scores"],
-                       "case_id": r["case_id"], "latency_ms": r["latency_ms"]}
-                      for (amt, ref), r in zip(steps, results)], "last": results[-1]}
+    gap = {"split_threat": 0.5, "coercive": 37.0, "child_support": 14 * 24 * 60.0, "friends": 3 * 24 * 60.0,
+           "account_switch": 45.0}[name]
+    out = []
+    for step in steps:
+        if step[0] == "hide":
+            screener.engine.hide(privacy.token(PEOPLE[to][1]), privacy.token(PEOPLE[step[1]][1]),
+                                 _demo_time(gap).timestamp())
+            store.hide(privacy.token(PEOPLE[to][1]), privacy.token(PEOPLE[step[1]][1]), DEMO_CLOCK["t"].timestamp())
+            continue
+        sender, amt, ref = step if len(step) == 3 else (frm, *step)
+        r = demo_send(sender, to, amt, ref, step_minutes=gap)
+        out.append({"sender": PEOPLE[sender][0], "reference": ref, "amount": amt, "decision": r["decision"],
+                    "scores": r["scores"], "case_id": r["case_id"], "latency_ms": r["latency_ms"], "_full": r})
+    last = out[-1].pop("_full")
+    for o in out:
+        o.pop("_full", None)
+    return {"steps": out, "last": last}
 
 
 @app.post("/demo/reset")

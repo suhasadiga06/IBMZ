@@ -1,0 +1,183 @@
+<title>SafePay Recording Script</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: A4 reading script. Small "do" lines, large "say" lines, one scene per block. Single light look, deck palette. */
+:root {
+  --paper: #FFFFFF; --ink: #0F1B2D; --muted: #56627A; --rule: #D6DCE6; --tint: #F2F5FA;
+  --accent: #1D5BD6; --alert: #B5322A; --safe: #1B7146;
+  --display: "IBM Plex Sans Condensed", "Arial Narrow", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", Consolas, ui-monospace, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 11pt/1.45 var(--body);
+       padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px; }
+.doc { max-width: 760px; margin: 0 auto; }
+h1 { font: 700 26pt/1.05 var(--display); margin: 0; letter-spacing: -.01em; }
+h2 { font: 600 15pt/1.2 var(--display); margin: 22px 0 8px; text-wrap: balance; }
+.sub { color: var(--muted); margin: 4px 0 0; }
+.eyebrow { font: 600 8.5pt/1 var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--accent); }
+table { border-collapse: collapse; width: 100%; font-size: 10pt; }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; }
+td.t { font-family: var(--mono); white-space: nowrap; color: var(--accent); }
+ol, ul { margin: 0; padding-left: 20px; }
+li { margin: 3px 0; }
+code { font: 9.5pt var(--mono); background: var(--tint); padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere; }
+.scene { break-inside: avoid; border-top: 2px solid var(--ink); padding: 10px 0 14px; }
+.scene .hd { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.scene .hd b { font: 600 13pt var(--display); }
+.scene .hd span { font: 500 9.5pt var(--mono); color: var(--accent); white-space: nowrap; }
+.do { font-size: 9.5pt; color: var(--muted); margin: 4px 0 8px; }
+.do b { color: var(--ink); font-weight: 600; }
+.say { font: 400 15pt/1.5 var(--body); margin: 0; }
+.say em { font-style: normal; color: var(--alert); }
+.note { font-size: 9.5pt; color: var(--muted); }
+.opt { border: 1px dashed var(--rule); border-radius: 6px; padding: 10px 12px; margin-top: 6px; break-inside: avoid; }
+.box { background: var(--tint); border-radius: 6px; padding: 10px 14px; }
+.page-break { break-before: page; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.cols > * { min-width: 0; }
+@media (max-width: 640px) { .cols { grid-template-columns: 1fr; } .say { font-size: 13pt; } }
+@page { size: A4; margin: 16mm 16mm 14mm; }
+@media print { body { padding: 0; } .doc { max-width: none; } }
+</style>
+
+<div class="doc">
+
+<div class="eyebrow">IBM Z Datathon 2026 · SSF2026 · Suhas Adiga · individual entry</div>
+<h1>SafePay recording script</h1>
+<p class="sub">A 3-minute demo video. About 380 words in 2 minutes 50 seconds, which leaves 10 seconds spare. Speak calmly; you don't need to rush.</p>
+
+<h2>The video at a glance</h2>
+<table>
+  <tr><th>Time</th><th>Scene</th><th>The point it makes</th></tr>
+  <tr><td class="t">0:00–0:20</td><td>Title card</td><td>You can't block a bank transfer</td></tr>
+  <tr><td class="t">0:20–0:42</td><td>Threat split across 9 payments</td><td>SafePay reads the whole sentence; the money still arrives</td></tr>
+  <tr><td class="t">0:42–1:00</td><td>Polite but menacing</td><td>The pattern catches what words miss</td></tr>
+  <tr><td class="t">1:00–1:20</td><td>Sam's Message settings</td><td>The victim stays in control, and can leave in one tap</td></tr>
+  <tr><td class="t">1:20–1:40</td><td>Analyst console, case #2</td><td>Safe contact first; Granite helps, never contacts the sender</td></tr>
+  <tr><td class="t">1:40–1:58</td><td>Evidence pack</td><td>A signed record police can verify</td></tr>
+  <tr><td class="t">1:58–2:20</td><td>Evidence page</td><td>Weeks sooner, tested at a realistic scale, bias fixed</td></tr>
+  <tr><td class="t">2:20–2:42</td><td>SSH terminal on the z17</td><td>Built and measured on IBM Z</td></tr>
+  <tr><td class="t">2:42–2:50</td><td>Close</td><td>The money gets through, the abuse doesn't</td></tr>
+</table>
+
+<h2>Before you record (about 15 minutes ahead)</h2>
+<ol>
+  <li>The lab notebook container is stopped. (Check with <code>ssh ibmz "podman ps"</code>: it shouldn't list <code>notebook</code>.)</li>
+  <li>On the VM: <code>bash ~/safepay/run_safepay.sh</code> starts Granite and SafePay. If both already answer, you can skip this.</li>
+  <li>On the laptop, open the tunnel and leave that window open: <code>ssh -N -L 8090:127.0.0.1:8090 ibmz</code></li>
+  <li>Open <code>http://localhost:8090</code> and press <b>Reset</b> just before your first take. Then record the scenes in order: scene 2 creates case #1 and scene 3 creates case #2.</li>
+  <li>Between scene 3 and scene 5, open <code>http://localhost:8090/analyst</code> and wait until case #2 shows a <b>Granite brief</b> (one to two minutes). Takes are separate, so the wait doesn't appear in the video.</li>
+  <li>Click each scenario only once. Clicking one again adds more payments to the same case, and the evidence pack would no longer have "all eight".</li>
+  <li>On Windows: plug in the charger, close other apps, press <b>Win + N</b> → <i>Do not disturb</i>. Edge maximised, zoom 100%. Make the terminal font large.</li>
+</ol>
+<p class="note" style="margin-top:8px">Rehearse once without recording, then press <b>Reset</b> again before the real takes. If you use the optional account-switch beat instead of scene 3, Riley's case won't exist. In scene 4, allow a record for <b>Drew Kelly</b> (Casey's new account); in scene 5, open Drew's case; and in scene 6 say "all of his payments" instead of "all eight payments".</p>
+
+<div class="page-break"></div>
+<h2 style="margin-top:0">The script</h2>
+<p class="note">Small grey lines are what to do on screen. Large lines are what to say. Record one scene per take.</p>
+
+<div class="scene">
+  <div class="hd"><b>1 · Title card</b><span>0:00–0:20 · 20 s</span></div>
+  <p class="do">Show the title card: <b>SafePay · IBM Z Datathon 2026 · SSF2026</b>.</p>
+  <p class="say">Hi, I'm Suhas, and this is SafePay. When someone escapes an abuser, they block them everywhere. But you can't block a bank transfer. Abusers send one-cent payments with threats in the reference, and Australia's biggest bank finds about 1,500 high-risk cases a year.</p>
+</div>
+
+<div class="scene">
+  <div class="hd"><b>2 · Threat split across nine payments</b><span>0:20–0:42 · 22 s</span></div>
+  <p class="do">Demo page. Click <b>Threat split across 9 payments</b>. Point at Sam's app on the right, then the <b>Joined with recent</b> box in the middle.</p>
+  <p class="say">This is a real reported pattern: one threat split across nine transfers, so no single message trips a filter. SafePay joins them up, reads <em>"I am going to find you and kill you"</em>, and hides all nine. The money still arrives, because it could be child support she depends on.</p>
+</div>
+
+<div class="scene">
+  <div class="hd"><b>3 · Polite but menacing</b><span>0:42–1:00 · 18 s</span></div>
+  <p class="do">Click <b>Polite but menacing (coercive control)</b>. Point at the message score (about 0.0), then the relationship score.</p>
+  <p class="say">Now there are no rude words at all: "saw you at the gym today", "I'm outside". A toxicity model calls these harmless. My relationship model sees penny payments at night that are never answered, and opens a case.</p>
+  <div class="opt"><p class="do" style="margin-top:0"><b>Optional instead:</b> click <b>Hidden, then switches account</b> and say:</p>
+  <p class="say" style="font-size:13pt">Here Sam hides Casey, so Casey comes back from a new account. To any model that's a stranger. But for 14 days after a hide, new senders are held back, so even his first message is withheld.</p></div>
+</div>
+
+<div class="scene">
+  <div class="hd"><b>4 · Sam's message settings</b><span>1:00–1:20 · 20 s</span></div>
+  <p class="do">In Sam's app, open <b>Message settings</b>. Choose <b>In the app only</b>, set safe times <b>10:00–14:00</b>, tick <b>Someone else may see my phone</b>, press <b>Save</b>. Under Riley, choose <b>Application for a protection order</b> → <b>Allow a record</b>. Then press <b>Quick exit</b>.</p>
+  <p class="say">Sam decides how her bank may contact her: in the app only, ten till two, because someone else may see her phone. She allows a signed record of Riley's payments for a protection order. And one tap on quick exit makes her screen look like an ordinary account.</p>
+</div>
+
+<div class="scene">
+  <div class="hd"><b>5 · The analyst console</b><span>1:20–1:40 · 20 s</span></div>
+  <p class="do">Before this take, wait until case #2 shows its Granite brief. Click <b>Analyst console</b>, open case <b>#2</b>. Point at the safe-contact panel at the top, then the <b>Granite brief</b>.</p>
+  <p class="say">The bank's specialist team sees her rules first. IBM Granite, running on the same mainframe, drafts their brief, and it never writes to the sender, because tipping off an abuser can be dangerous.</p>
+</div>
+
+<div class="scene">
+  <div class="hd"><b>6 · The evidence pack</b><span>1:40–1:58 · 18 s</span></div>
+  <p class="do">Click <b>Prepare signed evidence pack</b>. On the pack page, click <b>Verify</b>, then <b>Simulate tampering</b>.</p>
+  <p class="say">With her consent, I prepare a record of all eight payments, including the ones sent before the case opened. It's hash-chained and signed with Ed25519, so police can verify it. Add one full stop, and verification fails.</p>
+</div>
+
+<div class="scene">
+  <div class="hd"><b>7 · The evidence page</b><span>1:58–2:20 · 22 s</span></div>
+  <p class="do">Click <b>Evidence &amp; IBM Z</b>. Show the real-time vs monthly table, then scroll to <b>Stress test</b>, then the fairness table.</p>
+  <p class="say">Against the bank's published monthly approach, SafePay catches abuse in a median of 3 days instead of 19, and withholds 92% of abusive messages as they arrive. At a realistic scale, it raised 15 false alarms in 305,000 innocent relationships. And I found and fixed my model's bias against messages that mention "gay".</p>
+</div>
+
+<div class="scene">
+  <div class="hd"><b>8 · Running on IBM Z</b><span>2:20–2:42 · 22 s</span></div>
+  <p class="do">Switch to the SSH terminal. Type <code>uname -m</code>, then <code>grep -m1 machine /proc/cpuinfo</code>. Then back to the speed table on the evidence page.</p>
+  <p class="say">All of this runs on an IBM z17 in LinuxONE Community Cloud: big-endian s390x, over 900 payments a second in one process, usually well under a millisecond each. I benchmarked the on-chip AI accelerator honestly: for this small model the CPU was faster, so that's what I ship. No data leaves the platform.</p>
+</div>
+
+<div class="scene">
+  <div class="hd"><b>9 · Close</b><span>2:42–2:50 · 8 s</span></div>
+  <p class="do">Back to Sam's app, then the title card.</p>
+  <p class="say">SafePay: the money gets through, the abuse doesn't, and the evidence does. Thank you.</p>
+</div>
+
+<div class="page-break"></div>
+<h2 style="margin-top:0">Recording with Clipchamp (built into Windows 11)</h2>
+<ol>
+  <li>Start → type <b>Clipchamp</b> → <i>Create a new video</i> → <i>Record &amp; create</i> → <b>Screen and camera</b> (or just <b>Screen</b> if you'd rather not appear). Allow the camera and microphone, and pick the Edge window.</li>
+  <li><b>One scene per take.</b> Pause for a second before and after speaking; it makes trimming easy. A mistake then costs 20 seconds, not 3 minutes.</li>
+  <li>Record scene 8 (the terminal) as its own <b>Screen</b> take of the terminal window.</li>
+  <li>Drag the takes onto the timeline in order and trim the gaps. If you used the camera, shrink it to a small circle in the empty area under the middle panel, so it never covers Sam's app or the IBM z17 chip.</li>
+  <li><i>Text</i> → add the title card for the first 5 seconds: <b>SafePay · IBM Z Datathon 2026 · SSF2026</b>.</li>
+  <li>Check the length on the timeline: <b>3:00 or less.</b></li>
+  <li><i>Export</i> → <b>1080p</b>. Watch the whole file once.</li>
+  <li>Upload to YouTube as <b>Unlisted</b> (or Google Drive shared with <i>Anyone with the link</i>) and paste the link into Hack2Skill.</li>
+</ol>
+
+<div class="cols" style="margin-top:14px">
+  <div class="box">
+    <b>Voice</b>
+    <ul class="note" style="margin-top:4px">
+      <li>Earphones with a mic near your mouth beat the laptop mic.</li>
+      <li>Quiet room. Do a 10-second test take and listen back.</li>
+      <li>Smile on the first and last lines; it's audible.</li>
+    </ul>
+  </div>
+  <div class="box">
+    <b>Never show</b>
+    <ul class="note" style="margin-top:4px">
+      <li>The <code>.pem</code> key file or its folder</li>
+      <li>The Jupyter lab token</li>
+      <li>Your email, chats or notifications</li>
+    </ul>
+  </div>
+</div>
+
+<h2>Submitting on Hack2Skill</h2>
+<ul>
+  <li>Project title: <b>Suhas Adiga_IBM Z Datathon 2026 Project</b></li>
+  <li>Put <b>SSF2026</b> in the project description.</li>
+  <li>Attach: the video link, <code>github.com/suhasadiga06/IBMZ</code>, <code>SafePay_pitch_deck.pdf</code>, and <code>SafePay_architecture.png</code> as the design flowchart.</li>
+  <li>The README lists every open-source library and dataset with its licence, which the rules ask for.</li>
+  <li>Deadline: <b>Sunday 18 October 2026, 10:00 PM IST.</b></li>
+</ul>
+
+</div>

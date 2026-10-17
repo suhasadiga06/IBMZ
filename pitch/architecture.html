@@ -1,0 +1,172 @@
+<title>SafePay Architecture</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: one wide architecture figure, left to right along the payment path. Single light look, deck palette. */
+:root {
+  --paper: #F6F7F9; --card: #FFFFFF; --zone: #ECF0F6; --ink: #0F1B2D; --muted: #56627A; --rule: #C9D1DD;
+  --accent: #1D5BD6; --alert: #B5322A; --safe: #1B7146;
+  --display: "IBM Plex Sans Condensed", "Arial Narrow", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", Consolas, ui-monospace, monospace;
+  color-scheme: light;
+}
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--body);
+       padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px; }
+.page { max-width: 1240px; margin: 0 auto; }
+h1 { font: 600 22px/1.2 var(--display); margin: 0 0 4px; text-wrap: balance; }
+.sub { color: var(--muted); font-size: 14px; margin: 0 0 14px; }
+figure { margin: 0; }
+.scroll { overflow-x: auto; }
+figcaption { color: var(--muted); font-size: 13.5px; line-height: 1.45; margin-top: 10px; max-width: 80ch; }
+
+/* Diagram classes (shared with the pitch deck) */
+.dg { display: block; width: 100%; height: auto; min-width: 760px; }
+.dg text { font-family: var(--body); font-size: 12px; fill: var(--ink); }
+.dg .t { font-family: var(--display); font-weight: 600; font-size: 14.5px; }
+.dg .m { fill: var(--muted); font-size: 11.5px; }
+.dg .lab { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+.dg .lab.hot { fill: var(--accent); }
+.dg .zone { fill: var(--zone); stroke: var(--ink); stroke-width: 1.2; }
+.dg .bx { fill: var(--card); stroke: var(--rule); stroke-width: 1.2; }
+.dg .bx.hot { stroke: var(--accent); stroke-width: 1.8; }
+.dg .bx.ext { fill: var(--paper); stroke: var(--ink); stroke-width: 1.2; }
+.dg .ln { fill: none; stroke: var(--ink); stroke-width: 1.4; }
+.dg .ln.hot { stroke: var(--accent); stroke-width: 2.2; }
+.dg .ln.dash { stroke: var(--muted); stroke-dasharray: 5 4; }
+.dg .ah-a { fill: var(--accent); } .dg .ah-i { fill: var(--ink); } .dg .ah-m { fill: var(--muted); }
+</style>
+
+<div class="page">
+<h1>SafePay architecture</h1>
+<p class="sub">IBM Z Datathon 2026 · SSF2026 · as built and measured on an IBM z17 in LinuxONE Community Cloud</p>
+<figure>
+<div class="scroll">
+<svg class="dg" viewBox="0 0 1240 560" role="img" aria-label="SafePay architecture. Every payment, as ISO 20022 pacs.008 or pain.001, passes inline through parsing, pseudonymisation, the message model, the relationship model and policy on one IBM z17, then goes on to the recipient with the money delivered and the message shown or withheld. Cases, IBM Granite and signed evidence packs sit off the payment path. Data leaves only as the forwarded payment or a consented, signed pack.">
+  <defs>
+    <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-a" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="ai" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-i" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="am" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-m" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+
+  <!-- Platform boundary -->
+  <rect class="zone" x="196" y="30" width="828" height="520" rx="10"/>
+  <text class="t" x="216" y="56">IBM LinuxONE · z17 (s390x) · SafePay service</text>
+  <text class="m" x="216" y="74">No external AI API. Data leaves only as the forwarded payment or a consented, signed pack.</text>
+
+  <!-- Outside: senders -->
+  <rect class="bx ext" x="20" y="96" width="150" height="50" rx="6"/>
+  <text class="t" x="95" y="117" text-anchor="middle">Sender's bank</text>
+  <text class="m" x="95" y="134" text-anchor="middle">banking app</text>
+  <rect class="bx ext" x="20" y="196" width="150" height="56" rx="6"/>
+  <text class="t" x="95" y="219" text-anchor="middle">Payment network</text>
+  <text class="m" x="95" y="237" text-anchor="middle">interbank pacs.008</text>
+
+  <!-- Hot path: every payment, inline -->
+  <text class="lab hot" x="535" y="182">every payment, inline · median 0.27 ms · p99 5.9 ms</text>
+  <rect class="bx hot" x="225" y="192" width="135" height="64" rx="6"/>
+  <text class="t" x="292.5" y="214" text-anchor="middle">Parse</text>
+  <text x="292.5" y="231" text-anchor="middle">ISO 20022</text>
+  <text class="m" x="292.5" y="246" text-anchor="middle">pacs.008 · pain.001</text>
+  <rect class="bx hot" x="380" y="192" width="135" height="64" rx="6"/>
+  <text class="t" x="447.5" y="214" text-anchor="middle">Pseudonymise</text>
+  <text x="447.5" y="231" text-anchor="middle">HMAC tokens</text>
+  <text class="m" x="447.5" y="246" text-anchor="middle">for every account</text>
+  <rect class="bx hot" x="535" y="192" width="135" height="64" rx="6"/>
+  <text class="t" x="602.5" y="214" text-anchor="middle">Message model</text>
+  <text x="602.5" y="231" text-anchor="middle">harm · threat</text>
+  <text class="m" x="602.5" y="246" text-anchor="middle">+ joined recent</text>
+  <rect class="bx hot" x="690" y="192" width="135" height="64" rx="6"/>
+  <text class="t" x="757.5" y="214" text-anchor="middle">Relationship</text>
+  <text x="757.5" y="231" text-anchor="middle">Snap ML forest</text>
+  <text class="m" x="757.5" y="246" text-anchor="middle">CPU, or AI unit</text>
+  <rect class="bx hot" x="845" y="192" width="135" height="64" rx="6"/>
+  <text class="t" x="912.5" y="214" text-anchor="middle">Policy</text>
+  <text x="912.5" y="231" text-anchor="middle">deliver · withhold</text>
+  <text class="m" x="912.5" y="246" text-anchor="middle">open case</text>
+
+  <line class="ln hot" x1="170" y1="224" x2="222" y2="224" marker-end="url(#aa)"/>
+  <polyline class="ln hot" points="170,116 292,116 292,189" marker-end="url(#aa)"/>
+  <text class="lab hot" x="204" y="108">pain.001 · before send</text>
+  <line class="ln hot" x1="361" y1="224" x2="377" y2="224" marker-end="url(#aa)"/>
+  <line class="ln hot" x1="516" y1="224" x2="532" y2="224" marker-end="url(#aa)"/>
+  <line class="ln hot" x1="671" y1="224" x2="687" y2="224" marker-end="url(#aa)"/>
+  <line class="ln hot" x1="826" y1="224" x2="842" y2="224" marker-end="url(#aa)"/>
+  <line class="ln hot" x1="981" y1="224" x2="1057" y2="224" marker-end="url(#aa)"/>
+
+  <!-- Outside: recipient -->
+  <rect class="bx ext" x="1060" y="192" width="160" height="64" rx="6"/>
+  <text class="t" x="1140" y="213" text-anchor="middle">Recipient's app</text>
+  <text class="m" x="1140" y="230" text-anchor="middle">money: always delivered</text>
+  <text class="m" x="1140" y="245" text-anchor="middle">message: shown or withheld</text>
+
+  <!-- Relationship state -->
+  <rect class="bx" x="545" y="290" width="255" height="50" rx="6"/>
+  <text class="t" x="672.5" y="311" text-anchor="middle">Relationship state</text>
+  <text class="m" x="672.5" y="329" text-anchor="middle">encrypted · last 20 messages · O(1) update</text>
+  <line class="ln" x1="757" y1="260" x2="757" y2="287" marker-start="url(#ai)" marker-end="url(#ai)"/>
+  <text class="lab" x="765" y="278">features</text>
+  <line class="ln" x1="602" y1="287" x2="602" y2="260" marker-end="url(#ai)"/>
+  <text class="lab" x="610" y="278">recent messages</text>
+
+  <!-- Case path -->
+  <line class="ln hot" x1="912" y1="258" x2="912" y2="361" marker-end="url(#aa)"/>
+  <text class="lab hot" x="920" y="300">open case</text>
+  <text class="lab hot" x="920" y="315">+ evidence</text>
+  <rect class="bx" x="845" y="364" width="135" height="68" rx="6"/>
+  <text class="t" x="912.5" y="386" text-anchor="middle">Case store</text>
+  <text x="912.5" y="403" text-anchor="middle">hash-chained</text>
+  <text class="m" x="912.5" y="419" text-anchor="middle">AES-256-GCM</text>
+
+  <!-- Victim's choices flow back in -->
+  <polyline class="ln dash" points="1200,258 1200,346 950,346 950,361" marker-end="url(#am)"/>
+  <text class="lab" x="1192" y="339" text-anchor="end">prefs · consent · hide</text>
+
+  <!-- Specialist team -->
+  <line class="ln" x1="981" y1="398" x2="1057" y2="398" marker-end="url(#ai)"/>
+  <rect class="bx ext" x="1060" y="364" width="160" height="68" rx="6"/>
+  <text class="t" x="1140" y="386" text-anchor="middle">Specialist team</text>
+  <text x="1140" y="403" text-anchor="middle">analyst console</text>
+  <text class="m" x="1140" y="419" text-anchor="middle">every view audited</text>
+
+  <!-- Granite, off the path -->
+  <rect class="bx" x="545" y="370" width="255" height="62" rx="6"/>
+  <text class="t" x="672.5" y="392" text-anchor="middle">IBM Granite 3.3 2B</text>
+  <text x="672.5" y="409" text-anchor="middle">llama.cpp · background queue</text>
+  <text class="m" x="672.5" y="424" text-anchor="middle">never on the payment path</text>
+  <line class="ln dash" x1="843" y1="386" x2="804" y2="386" marker-end="url(#am)"/>
+  <text class="lab" x="823" y="379" text-anchor="middle">facts</text>
+  <line class="ln dash" x1="802" y1="416" x2="841" y2="416" marker-end="url(#am)"/>
+  <text class="lab" x="823" y="430" text-anchor="middle">brief</text>
+
+  <!-- Keys -->
+  <rect class="bx" x="225" y="370" width="290" height="62" rx="6"/>
+  <text class="t" x="370" y="392" text-anchor="middle">Keys</text>
+  <text x="370" y="409" text-anchor="middle">HMAC · AES-256-GCM · Ed25519</text>
+  <text class="m" x="370" y="424" text-anchor="middle">production: IBM Crypto Express HSM</text>
+
+  <!-- Evidence pack -->
+  <line class="ln" x1="912" y1="432" x2="912" y2="459" marker-end="url(#ai)"/>
+  <text class="lab" x="920" y="450">with consent</text>
+  <rect class="bx" x="845" y="462" width="135" height="50" rx="6"/>
+  <text class="t" x="912.5" y="483" text-anchor="middle">Evidence pack</text>
+  <text class="m" x="912.5" y="500" text-anchor="middle">SHA-256 · Ed25519</text>
+  <line class="ln" x1="981" y1="487" x2="1057" y2="487" marker-end="url(#ai)"/>
+  <rect class="bx ext" x="1060" y="457" width="160" height="60" rx="6"/>
+  <text class="t" x="1140" y="479" text-anchor="middle">Police · court</text>
+  <text class="m" x="1140" y="497" text-anchor="middle">verify with public key</text>
+
+  <!-- Legend: the three line styles repeat across the figure -->
+  <line class="ln hot" x1="225" y1="482" x2="257" y2="482"/>
+  <text x="266" y="486">every payment, inline</text>
+  <line class="ln" x1="225" y1="504" x2="257" y2="504"/>
+  <text x="266" y="508">on demand</text>
+  <line class="ln dash" x1="225" y1="526" x2="257" y2="526"/>
+  <text x="266" y="530">background, or the customer's choice</text>
+</svg>
+</div>
+<figcaption>Every payment takes the blue path inline, in about a millisecond, on one IBM z17. The money always reaches the recipient; only the message can be withheld. IBM Granite works in a background queue, and data leaves the platform only as the forwarded payment or a signed evidence pack the victim consented to.</figcaption>
+</figure>
+</div>

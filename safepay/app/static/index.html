@@ -95,6 +95,7 @@
     <button class="btn ghost" data-script="split_threat">Threat split across 9 payments</button>
     <button class="btn ghost" data-script="coercive">Polite but menacing (coercive control)</button>
     <button class="btn ghost" data-script="child_support">Child support with abuse</button>
+    <button class="btn ghost" data-script="account_switch">Hidden, then switches account</button>
     <button class="btn ghost" data-script="friends">Friends' banter (should pass)</button>
     <button class="btn ghost" id="reset" title="Clear demo data">Reset</button>
   </div>
@@ -164,7 +165,7 @@
 
 <script>
 const $ = (s, r = document) => r.querySelector(s);
-const NAMES = {jordan: "Jordan Reid", sam: "Sam Patel", alex: "Alex Chen", kim: "Kim Taylor", riley: "Riley Morgan", chris: "Chris Walker"};
+const NAMES = {jordan: "Jordan Reid", sam: "Sam Patel", alex: "Alex Chen", kim: "Kim Taylor", riley: "Riley Morgan", chris: "Chris Walker", casey: "Casey Brooks", drew: "Drew Kelly"};
 function el(tag, text, cls) { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; }
 async function api(path, opts) { const r = await fetch(path, opts); if (!r.ok) throw new Error(path + " " + r.status); return r.json(); }
 const post = (path, body) => api(path, {method: "POST", headers: {"Content-Type": "application/json"}, body: body ? JSON.stringify(body) : undefined});
@@ -336,7 +337,7 @@ document.querySelectorAll("[data-script]").forEach(b => b.onclick = async () => 
   b.disabled = true;
   try {
     const out = await post("/demo/script/" + b.dataset.script);
-    const to = {split_threat: "sam", coercive: "sam", child_support: "kim", friends: "sam"}[b.dataset.script];
+    const to = {split_threat: "sam", coercive: "sam", child_support: "kim", friends: "kim", account_switch: "sam"}[b.dataset.script];
     $("#recipient").value = to; render(out.last); await inbox();
   } finally { b.disabled = false; }
 });

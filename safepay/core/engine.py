@@ -18,7 +18,7 @@ from datetime import datetime
 import numpy as np
 
 from .normalize import EMOJI_RE, canonicalize
-from .state import PairState
+from .state import NO_HIDE_DAYS, PAIR_FEATURES, PairState
 from .textmodel import MessageModel
 
 MIN_LETTERS = 4
@@ -48,12 +48,39 @@ class Observation:
 
 
 class Engine:
-    def __init__(self, text: MessageModel, rel=None, cache_size: int = 50_000):
+    def __init__(self, text: MessageModel, rel=None, cache_size: int = 50_000, recipient_context: bool = True):
         self.text = text
         self.rel = rel
+        self.recipient_context = recipient_context
         self.states: dict[tuple[str, str], PairState] = {}
+        self.recip_hides: dict[str, list[tuple[float, str]]] = {}      # recipient -> [(ts, hidden sender)]
+        self.recip_first: dict[str, dict[str, float]] = {}            # recipient -> {sender: first payment ts}
         self._cache: OrderedDict[str, tuple[float, float]] = OrderedDict()
         self._cache_size = cache_size
+
+    @staticmethod
+    def for_bundle(text: MessageModel, bundle: dict, **kw) -> "Engine":
+        """An engine whose features match what this saved model was trained on."""
+        n = len(bundle.get("features", PAIR_FEATURES))
+        return Engine(text, bundle["model"], recipient_context=n > len(PAIR_FEATURES), **kw)
+
+    def index_recipients(self) -> None:
+        """Rebuild recipient context from loaded relationship states (after a restart)."""
+        for (s, r), st in self.states.items():
+            if st.n_tx:
+                self.recip_first.setdefault(r, {})[s] = st.first_ts
+
+    def recipient_features(self, sender: str, recipient: str, first_ts: float) -> list[float]:
+        hides = [t for t, s2 in self.recip_hides.get(recipient, ()) if s2 != sender and t <= first_ts]
+        if not hides:
+            return [0.0, NO_HIDE_DAYS, 0.0]
+        last = max(hides)
+        new = sum(1 for t0 in self.recip_first.get(recipient, {}).values() if t0 > last)
+        return [1.0, min((first_ts - last) / 86400, NO_HIDE_DAYS), float(new)]
+
+    def features(self, sender: str, recipient: str, st: PairState, ts: float) -> list[float]:
+        f = st.features(ts)
+        return f + self.recipient_features(sender, recipient, st.first_ts) if self.recipient_context else f
 
     def score_text(self, text: str) -> tuple[float, float]:
         if not informative(text):
@@ -79,6 +106,7 @@ class Engine:
     def hide(self, recipient: str, sender: str, ts: float) -> None:
         st = self.state(sender, recipient)
         st.hidden_at = st.hidden_at or ts
+        self.recip_hides.setdefault(recipient, []).append((ts, sender))
 
     def observe(self, when: datetime, sender: str, recipient: str, amount: float, reference: str) -> Observation:
         ts = when.timestamp()
@@ -88,10 +116,12 @@ class Engine:
         joined = st.split_text(ts, reference)
         s_harm, s_threat = self.score_text(joined) if joined else (0.0, 0.0)
         st.update(ts, when.hour, amount, reference, harm, threat, s_harm, s_threat)
+        if n_before == 0:
+            self.recip_first.setdefault(recipient, {})[sender] = st.first_ts
         # This payment is a reply in the eyes of the opposite pair, if that pair exists.
         back = self.states.get((recipient, sender))
         if back is not None:
             back.reply()
-        feats = st.features(ts)
+        feats = self.features(sender, recipient, st, ts)
         score = float(self.rel.predict_proba(np.asarray([feats], dtype=np.float32))[0, 1]) if self.rel else 0.0
         return Observation(harm, threat, joined, s_harm, s_threat, score, feats, st, n_before)

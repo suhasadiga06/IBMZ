@@ -105,7 +105,7 @@ def main() -> None:
     n_ok, n_bad, seed = SIZES["test"]
     w = W.build("test", n_ok, n_bad, seed)
     ids = {acct: f"U{i:05d}" for i, acct in enumerate(sorted(w.customers))}
-    rep = replay(w, Engine(text, rel["model"]))
+    rep = replay(w, Engine.for_bundle(text, rel))
     sp = defaultdict(float)
     for r in rep["rows"]:
         u = (ids[r["unit"][0]], ids[r["unit"][1]])

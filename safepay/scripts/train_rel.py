@@ -32,15 +32,15 @@ from sklearn.metrics import f1_score, precision_recall_curve, roc_auc_score
 
 from safepay.core import relmodel
 from safepay.core.engine import Engine
-from safepay.core.policy import Thresholds, content_flag, opens_case
-from safepay.core.state import FEATURES
+from safepay.core.policy import Thresholds, content_flag, opens_case, protect_after_hide
+from safepay.core.state import FEATURES, PAIR_FEATURES
 from safepay.sim import world as W
 
 ROOT = Path(__file__).resolve().parents[2]
 ART = ROOT / "artifacts"
-# Test seeds 3 and 4 were used while diagnosing generalisation problems (see
-# README), so final numbers come from seed 5, which no decision is based on.
-SIZES = {"train": (4000, 450, 1), "val": (3000, 300, 2), "test": (4000, 400, 5)}
+# Test seeds 3-5 were used for earlier versions, and 9 for a first look at account
+# switching (see README), so final numbers come from seed 10, which no decision is based on.
+SIZES = {"train": (4000, 450, 1), "val": (3000, 300, 2), "test": (4000, 400, 10)}
 
 
 # -- replay a world through the engine -----------------------------------------
@@ -65,7 +65,9 @@ def replay(world: W.World, engine: Engine) -> dict:
                      "rel": obs.rel_score, "harm": obs.harm, "threat": obs.threat,
                      "split_harm": obs.split_harm, "split_threat": obs.split_threat,
                      "ref": tx.reference, "amount": tx.amount, "hidden": obs.state.hidden_at > 0
-                     and tx.ts.timestamp() >= obs.state.hidden_at})
+                     and tx.ts.timestamp() >= obs.state.hidden_at,
+                     "after_hide": protect_after_hide(engine.recipient_features(tx.sender, tx.recipient, obs.state.first_ts),
+                                                      obs.state.n_reply)})
     return {"rows": rows, "abusive": abusive_units, "kinds": kinds, "rels": rels}
 
 
@@ -147,7 +149,16 @@ def evaluate(first_flag: dict, units: set, abusive: dict, kinds: dict, first_abu
         "delay_hours_p90": round(float(np.percentile(delays, 90)), 1) if delays else None,
         "caught_within_24h_share": round(sum(d <= 24 for d in delays) / max(tp + fn, 1), 4),
         "flag_rate_by_kind": {k: round(v[1] / v[0], 4) for k, v in sorted(per_kind.items())},
+        "delay_hours_median_by_kind": {k: round(float(np.median(v)), 1) for k, v in sorted(delays_by_kind(first_flag, units, abusive, kinds, first_abuse).items()) if v},
     }
+
+
+def delays_by_kind(first_flag, units, abusive, kinds, first_abuse) -> dict:
+    out = defaultdict(list)
+    for u in units:
+        if u in abusive and u in first_flag and first_abuse.get(u):
+            out[kinds.get(u, "other")].append((first_flag[u] - first_abuse[u]).total_seconds() / 3600)
+    return out
 
 
 def first_flags(rows, t: Thresholds) -> dict:
@@ -162,19 +173,28 @@ def first_flags(rows, t: Thresholds) -> dict:
     return out
 
 
-def message_outcomes(rows, flags: dict, t_harm: float, t_threat: float) -> dict:
+def message_outcomes(rows, flags: dict, t_harm: float, t_threat: float, kinds: dict | None = None,
+                     protect: bool = True) -> dict:
     """Which messages would have been hidden from the recipient, as they arrived."""
     hidden = {1: [0, 0], 0: [0, 0]}
+    by_kind = defaultdict(lambda: [0, 0])
     for r in rows:
         if not r["ref"]:
             continue
         flagged = r["unit"] in flags and r["ts"] >= flags[r["unit"]]
         hide = (r["harm"] >= t_harm or r["threat"] >= t_threat or r["split_harm"] >= t_harm
-                or r["split_threat"] >= t_threat or flagged or r["hidden"])
+                or r["split_threat"] >= t_threat or flagged or r["hidden"] or (protect and r.get("after_hide")))
         hidden[r["y"]][0] += 1
         hidden[r["y"]][1] += hide
-    return {"abusive_messages": hidden[1][0], "abusive_hidden_share": round(hidden[1][1] / max(hidden[1][0], 1), 4),
-            "innocent_messages": hidden[0][0], "innocent_hidden_share": round(hidden[0][1] / max(hidden[0][0], 1), 4)}
+        if kinds is not None and r["y"]:
+            k = by_kind[kinds.get(r["unit"], "other")]
+            k[0] += 1
+            k[1] += hide
+    out = {"abusive_messages": hidden[1][0], "abusive_hidden_share": round(hidden[1][1] / max(hidden[1][0], 1), 4),
+           "innocent_messages": hidden[0][0], "innocent_hidden_share": round(hidden[0][1] / max(hidden[0][0], 1), 4)}
+    if kinds is not None:
+        out["abusive_hidden_share_by_kind"] = {k: round(v[1] / v[0], 4) for k, v in sorted(by_kind.items()) if v[0]}
+    return out
 
 
 def main() -> None:
@@ -182,7 +202,10 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--scale", type=float, default=1.0, help="shrink worlds for a quick smoke test")
     ap.add_argument("--out", default="", help="suffix for output files (smoke tests)")
+    ap.add_argument("--pair-only", action="store_true", help="ablation: no recipient-side features")
     args = ap.parse_args()
+    feats = PAIR_FEATURES if args.pair_only else FEATURES
+    ctx = not args.pair_only
     for k, (a, b, s) in list(SIZES.items()):
         SIZES[k] = (max(int(a * args.scale), 20), max(int(b * args.scale), 10), s)
     text = joblib.load(ART / "text.joblib")
@@ -199,7 +222,7 @@ def main() -> None:
     rep = {}
     for split, w in worlds.items():
         t0 = time.time()
-        rep[split] = replay(w, Engine(text))
+        rep[split] = replay(w, Engine(text, recipient_context=ctx))
         print(f"replayed {split}: {len(rep[split]['rows'])} payments in {time.time() - t0:.1f}s", flush=True)
 
     tr = rep["train"]["rows"]
@@ -234,17 +257,22 @@ def main() -> None:
     # Save before optimising: Snap ML discards the original trees once they are
     # converted for an inference engine, so only the unconverted model can be
     # re-optimised later (the service and benchmark do that on load).
-    joblib.dump({"model": model, "kind": kind, "threshold": t_case, "features": FEATURES},
+    joblib.dump({"model": model, "kind": kind, "threshold": t_case, "features": feats},
                 ART / f"rel{args.out}.joblib")
     t0 = time.time()
     fmt = relmodel.optimise(model, Xtr)
-    live = replay(test_w, Engine(text, model))
+    val_live = replay(worlds["val"], Engine(text, model, recipient_context=ctx))
+    vw = worlds["val"]
+    val_eval = evaluate(first_flags(val_live["rows"], Thresholds(t_harm, t_threat, t_case)), {r["unit"] for r in val_live["rows"]},
+                        val_live["abusive"], val_live["kinds"], {(r.sender, r.recipient): r.first_abuse for r in vw.relationships if r.label})
+    print("validation:", {k: v for k, v in val_eval.items() if k != "flag_rate_by_kind"}, flush=True)
+    live = replay(test_w, Engine(text, model, recipient_context=ctx))
     replay_s = time.time() - t0
     units = {r["unit"] for r in live["rows"]}
     first_abuse = {(r.sender, r.recipient): r.first_abuse for r in test_w.relationships if r.label}
     ours_flags = first_flags(live["rows"], Thresholds(t_harm, t_threat, t_case))
     ours = evaluate(ours_flags, units, live["abusive"], live["kinds"], first_abuse)
-    ours["messages"] = message_outcomes(live["rows"], ours_flags, t_harm, t_threat)
+    ours["messages"] = message_outcomes(live["rows"], ours_flags, t_harm, t_threat, live["kinds"])
     print("SafePay (real-time):", {k: v for k, v in ours.items() if k != "flag_rate_by_kind"}, flush=True)
 
     # Baseline: monthly batch.
@@ -271,10 +299,11 @@ def main() -> None:
     metrics = {
         "worlds": {s: {"relationships": len(w.relationships), "payments": len(w.txs),
                        "abusive": sum(r.label for r in w.relationships)} for s, w in worlds.items()},
-        "model_selection": results, "chosen": kind, "case_threshold": round(t_case, 4),
+        "model_selection": results, "chosen": kind, "case_threshold": round(t_case, 4), "features": feats,
+        "validation_realtime": val_eval,
         "tree_format": fmt, "test_replay_seconds": round(replay_s, 1),
         "safepay_realtime": ours, "cba_style_monthly": base,
-        "feature_importance": dict(sorted(zip(FEATURES, map(float, importances)), key=lambda kv: -kv[1]))
+        "feature_importance": dict(sorted(zip(feats, map(float, importances)), key=lambda kv: -kv[1]))
         if importances is not None else None,
     }
     (ART / f"metrics_rel{args.out}.json").write_text(json.dumps(metrics, indent=2, default=str))
