@@ -51,20 +51,22 @@ code { font: 9.5pt var(--mono); background: var(--tint); padding: 1px 5px; borde
 
 <div class="eyebrow">IBM Z Datathon 2026 · SSF2026 · Suhas Adiga · individual entry</div>
 <h1>SafePay recording script</h1>
-<p class="sub">A 3-minute demo video. About 380 words in 2 minutes 50 seconds, which leaves 10 seconds spare. Speak calmly; you don't need to rush.</p>
+<p class="sub">A 3-minute video that moves between the pitch deck and the live demo while you speak: a slide explains each idea, then the demo shows it working. About 380 words in 2 minutes 52 seconds. Speak calmly; you don't need to rush.</p>
 
 <h2>The video at a glance</h2>
 <table>
-  <tr><th>Time</th><th>Scene</th><th>The point it makes</th></tr>
-  <tr><td class="t">0:00–0:20</td><td>Title card</td><td>You can't block a bank transfer</td></tr>
-  <tr><td class="t">0:20–0:42</td><td>Threat split across 9 payments</td><td>SafePay reads the whole sentence; the money still arrives</td></tr>
-  <tr><td class="t">0:42–1:00</td><td>Polite but menacing</td><td>The pattern catches what words miss</td></tr>
-  <tr><td class="t">1:00–1:20</td><td>Sam's Message settings</td><td>The victim stays in control, and can leave in one tap</td></tr>
-  <tr><td class="t">1:20–1:40</td><td>Analyst console, case #2</td><td>Safe contact first; Granite helps, never contacts the sender</td></tr>
-  <tr><td class="t">1:40–1:58</td><td>Evidence pack</td><td>A signed record police can verify</td></tr>
-  <tr><td class="t">1:58–2:20</td><td>Evidence page</td><td>Weeks sooner, tested at a realistic scale, bias fixed</td></tr>
-  <tr><td class="t">2:20–2:42</td><td>SSH terminal on the z17</td><td>Built and measured on IBM Z</td></tr>
-  <tr><td class="t">2:42–2:50</td><td>Close</td><td>The money gets through, the abuse doesn't</td></tr>
+  <tr><th>Time</th><th>On screen</th><th>The point it makes</th></tr>
+  <tr><td class="t">0:00–0:15</td><td>Slides 1–2</td><td>You can't block a bank transfer</td></tr>
+  <tr><td class="t">0:15–0:30</td><td>Slide 3</td><td>Word lists and monthly scoring are easy to dodge, and slow</td></tr>
+  <tr><td class="t">0:30–0:45</td><td>Slide 4</td><td>A decision on every payment, inside the payment flow</td></tr>
+  <tr><td class="t">0:45–1:05</td><td><b>Demo:</b> threat split across 9 payments</td><td>SafePay reads the whole sentence; the money still arrives</td></tr>
+  <tr><td class="t">1:05–1:17</td><td>Slide 5</td><td>Three layers, because each one alone misses something</td></tr>
+  <tr><td class="t">1:17–1:35</td><td><b>Demo:</b> polite but menacing</td><td>The pattern catches what words miss</td></tr>
+  <tr><td class="t">1:35–1:55</td><td><b>Demo:</b> Message settings</td><td>The victim stays in control, and can leave in one tap</td></tr>
+  <tr><td class="t">1:55–2:17</td><td><b>Demo:</b> analyst console and evidence pack</td><td>Granite helps the specialist team; the evidence can be verified</td></tr>
+  <tr><td class="t">2:17–2:32</td><td>Slide 7</td><td>Weeks sooner than monthly scoring</td></tr>
+  <tr><td class="t">2:32–2:45</td><td>Slide 11</td><td>Fast and private on IBM Z</td></tr>
+  <tr><td class="t">2:45–2:52</td><td>Slide 13</td><td>The money gets through, the abuse doesn't</td></tr>
 </table>
 
 <h2>Before you record (about 15 minutes ahead)</h2>
@@ -72,81 +74,90 @@ code { font: 9.5pt var(--mono); background: var(--tint); padding: 1px 5px; borde
   <li>The lab notebook container is stopped. (Check with <code>ssh ibmz "podman ps"</code>: it shouldn't list <code>notebook</code>.)</li>
   <li>On the VM: <code>bash ~/safepay/run_safepay.sh</code> starts Granite and SafePay. If both already answer, you can skip this.</li>
   <li>On the laptop, open the tunnel and leave that window open: <code>ssh -N -L 8090:127.0.0.1:8090 ibmz</code></li>
-  <li>Open <code>http://localhost:8090</code> and press <b>Reset</b> just before your first take. Then record the scenes in order: scene 2 creates case #1 and scene 3 creates case #2.</li>
-  <li>Between scene 3 and scene 5, open <code>http://localhost:8090/analyst</code> and wait until case #2 shows a <b>Granite brief</b> (one to two minutes). Takes are separate, so the wait doesn't appear in the video.</li>
+  <li>In one Edge window, open two tabs: <b>tab 1</b> the deck (<code>pitch/SafePay_pitch_deck.pdf</code>; press <b>Ctrl + \</b> for one page at a time), <b>tab 2</b> the demo (<code>http://localhost:8090</code>). Switch between them with <b>Ctrl + 1</b> and <b>Ctrl + 2</b>. Maximise the window, zoom 100%.</li>
+  <li>On the demo, press <b>Reset</b> just before your first take. Then record the scenes in order: scene 4 creates case #1 and scene 6 creates case #2.</li>
   <li>Click each scenario only once. Clicking one again adds more payments to the same case, and the evidence pack would no longer have "all eight".</li>
-  <li>On Windows: plug in the charger, close other apps, press <b>Win + N</b> → <i>Do not disturb</i>. Edge maximised, zoom 100%. Make the terminal font large.</li>
+  <li>After scene 6, open <code>http://localhost:8090/analyst</code> and wait until case #2 shows a <b>Granite brief</b> (one to two minutes) before you record scene 8. Takes are separate, so the wait doesn't appear in the video.</li>
+  <li>On Windows: plug in the charger, close other apps, press <b>Win + N</b> → <i>Do not disturb</i>.</li>
 </ol>
-<p class="note" style="margin-top:8px">Rehearse once without recording, then press <b>Reset</b> again before the real takes. If you use the optional account-switch beat instead of scene 3, Riley's case won't exist. In scene 4, allow a record for <b>Drew Kelly</b> (Casey's new account); in scene 5, open Drew's case; and in scene 6 say "all of his payments" instead of "all eight payments".</p>
+<p class="note" style="margin-top:8px">Rehearse once without recording, then press <b>Reset</b> again before the real takes.</p>
 
 <div class="page-break"></div>
 <h2 style="margin-top:0">The script</h2>
-<p class="note">Small grey lines are what to do on screen. Large lines are what to say. Record one scene per take.</p>
+<p class="note">Small grey lines are what to show. Large lines are what to say. Record one scene per take. Scenes marked <b>DEMO</b> are in tab 2; the rest are slides in tab 1.</p>
 
 <div class="scene">
-  <div class="hd"><b>1 · Title card</b><span>0:00–0:20 · 20 s</span></div>
-  <p class="do">Show the title card: <b>SafePay · IBM Z Datathon 2026 · SSF2026</b>.</p>
-  <p class="say">Hi, I'm Suhas, and this is SafePay. When someone escapes an abuser, they block them everywhere. But you can't block a bank transfer. Abusers send one-cent payments with threats in the reference, and Australia's biggest bank finds about 1,500 high-risk cases a year.</p>
+  <div class="hd"><b>1 · The problem</b><span>0:00–0:15 · 15 s</span></div>
+  <p class="do">Slide 1 (title), then slide 2.</p>
+  <p class="say">Hi, I'm Suhas, and this is SafePay. When someone escapes an abuser, they block them everywhere. But you can't block a bank transfer, so abusers send one-cent payments with threats in the reference.</p>
 </div>
 
 <div class="scene">
-  <div class="hd"><b>2 · Threat split across nine payments</b><span>0:20–0:42 · 22 s</span></div>
-  <p class="do">Demo page. Click <b>Threat split across 9 payments</b>. Point at Sam's app on the right, then the <b>Joined with recent</b> box in the middle.</p>
-  <p class="say">This is a real reported pattern: one threat split across nine transfers, so no single message trips a filter. SafePay joins them up, reads <em>"I am going to find you and kill you"</em>, and hides all nine. The money still arrives, because it could be child support she depends on.</p>
+  <div class="hd"><b>2 · Why today's defences fall short</b><span>0:15–0:30 · 15 s</span></div>
+  <p class="do">Slide 3.</p>
+  <p class="say">Banks use banned-word lists, which abusers dodge with disguised spellings, or by splitting one threat across nine transfers. The best published model scores relationships once a month, so victims are exposed for weeks.</p>
 </div>
 
 <div class="scene">
-  <div class="hd"><b>3 · Polite but menacing</b><span>0:42–1:00 · 18 s</span></div>
+  <div class="hd"><b>3 · What SafePay does</b><span>0:30–0:45 · 15 s</span></div>
+  <p class="do">Slide 4. On the last sentence, switch to the demo (<b>Ctrl + 2</b>).</p>
+  <p class="say">SafePay sits inside the payment flow on IBM Z. It reads real ISO 20022 payment messages and makes a decision on every payment in about a millisecond. Here it is, running live.</p>
+</div>
+
+<div class="scene">
+  <div class="hd"><b>4 · DEMO · Threat split across nine payments</b><span>0:45–1:05 · 20 s</span></div>
+  <p class="do">Click <b>Threat split across 9 payments</b>. Point at the <b>Joined with recent</b> box in the middle, then Sam's app on the right.</p>
+  <p class="say">This threat is split across nine transfers, so no single message trips a filter. SafePay joins them up, reads <em>"I am going to find you and kill you"</em>, and hides all nine. The money still arrives, because it could be child support.</p>
+</div>
+
+<div class="scene">
+  <div class="hd"><b>5 · Three layers</b><span>1:05–1:17 · 12 s</span></div>
+  <p class="do">Slide 5 (<b>Ctrl + 1</b>). On the last word, back to the demo.</p>
+  <p class="say">That's one of three layers: a message model that undoes disguised spellings, a joiner for split messages, and a relationship model on IBM Snap ML.</p>
+</div>
+
+<div class="scene">
+  <div class="hd"><b>6 · DEMO · Polite but menacing</b><span>1:17–1:35 · 18 s</span></div>
   <p class="do">Click <b>Polite but menacing (coercive control)</b>. Point at the message score (about 0.0), then the relationship score.</p>
-  <p class="say">Now there are no rude words at all: "saw you at the gym today", "I'm outside". A toxicity model calls these harmless. My relationship model sees penny payments at night that are never answered, and opens a case.</p>
-  <div class="opt"><p class="do" style="margin-top:0"><b>Optional instead:</b> click <b>Hidden, then switches account</b> and say:</p>
-  <p class="say" style="font-size:13pt">Here Sam hides Casey, so Casey comes back from a new account. To any model that's a stranger. But for 14 days after a hide, new senders are held back, so even his first message is withheld.</p></div>
+  <p class="say">Here there are no rude words: <em>"saw you at the gym today"</em>, "I'm outside". The message scores near zero. But the relationship model sees penny payments at night, never answered, and opens a case.</p>
 </div>
 
 <div class="scene">
-  <div class="hd"><b>4 · Sam's message settings</b><span>1:00–1:20 · 20 s</span></div>
-  <p class="do">In Sam's app, open <b>Message settings</b>. Choose <b>In the app only</b>, set safe times <b>10:00–14:00</b>, tick <b>Someone else may see my phone</b>, press <b>Save</b>. Under Riley, choose <b>Application for a protection order</b> → <b>Allow a record</b>. Then press <b>Quick exit</b>.</p>
-  <p class="say">Sam decides how her bank may contact her: in the app only, ten till two, because someone else may see her phone. She allows a signed record of Riley's payments for a protection order. And one tap on quick exit makes her screen look like an ordinary account.</p>
+  <div class="hd"><b>7 · DEMO · The victim's side</b><span>1:35–1:55 · 20 s</span></div>
+  <p class="do">In Sam's app, open <b>Message settings</b>. Choose <b>In the app only</b>, tick <b>Someone else may see my phone</b>, press <b>Save</b>. Under Riley, choose <b>Application for a protection order</b> → <b>Allow a record</b>. Then press <b>Quick exit</b>.</p>
+  <p class="say">The victim stays in control. Sam chooses in-app contact only, because someone else may see her phone, and allows a record of Riley's payments for a protection order. One tap on quick exit hides everything.</p>
 </div>
 
 <div class="scene">
-  <div class="hd"><b>5 · The analyst console</b><span>1:20–1:40 · 20 s</span></div>
-  <p class="do">Before this take, wait until case #2 shows its Granite brief. Click <b>Analyst console</b>, open case <b>#2</b>. Point at the safe-contact panel at the top, then the <b>Granite brief</b>.</p>
-  <p class="say">The bank's specialist team sees her rules first. IBM Granite, running on the same mainframe, drafts their brief, and it never writes to the sender, because tipping off an abuser can be dangerous.</p>
+  <div class="hd"><b>8 · DEMO · Analyst console and evidence pack</b><span>1:55–2:17 · 22 s</span></div>
+  <p class="do">Before this take, wait until case #2 shows its Granite brief. Click <b>Analyst console</b>, open case <b>#2</b>, point at the safe-contact panel, then the <b>Granite brief</b>. Click <b>Prepare signed evidence pack</b>, then <b>Verify</b>, then <b>Simulate tampering</b>.</p>
+  <p class="say">The specialist team sees her rules first, and IBM Granite, running on the same machine, drafts their brief. With her consent, they prepare a signed evidence pack of all eight payments. Change one full stop, and verification fails.</p>
 </div>
 
 <div class="scene">
-  <div class="hd"><b>6 · The evidence pack</b><span>1:40–1:58 · 18 s</span></div>
-  <p class="do">Click <b>Prepare signed evidence pack</b>. On the pack page, click <b>Verify</b>, then <b>Simulate tampering</b>.</p>
-  <p class="say">With her consent, I prepare a record of all eight payments, including the ones sent before the case opened. It's hash-chained and signed with Ed25519, so police can verify it. Add one full stop, and verification fails.</p>
+  <div class="hd"><b>9 · Results</b><span>2:17–2:32 · 15 s</span></div>
+  <p class="do">Slide 7 (<b>Ctrl + 1</b>).</p>
+  <p class="say">Against the bank's monthly approach, SafePay opens a case in a median of 3 days instead of 19, and withholds 92% of abusive messages as they arrive.</p>
 </div>
 
 <div class="scene">
-  <div class="hd"><b>7 · The evidence page</b><span>1:58–2:20 · 22 s</span></div>
-  <p class="do">Click <b>Evidence &amp; IBM Z</b>. Show the real-time vs monthly table, then scroll to <b>Stress test</b>, then the fairness table.</p>
-  <p class="say">Against the bank's published monthly approach, SafePay catches abuse in a median of 3 days instead of 19, and withholds 92% of abusive messages as they arrive. At a realistic scale, it raised 15 false alarms in 305,000 innocent relationships. And I found and fixed my model's bias against messages that mention "gay".</p>
+  <div class="hd"><b>10 · Built on IBM Z</b><span>2:32–2:45 · 13 s</span></div>
+  <p class="do">Slide 11.</p>
+  <p class="say">It all runs on an IBM z17 in LinuxONE Community Cloud: over 900 payments a second, encrypted and pseudonymised, with no data leaving the platform.</p>
 </div>
 
 <div class="scene">
-  <div class="hd"><b>8 · Running on IBM Z</b><span>2:20–2:42 · 22 s</span></div>
-  <p class="do">Switch to the SSH terminal. Type <code>uname -m</code>, then <code>grep -m1 machine /proc/cpuinfo</code>. Then back to the speed table on the evidence page.</p>
-  <p class="say">All of this runs on an IBM z17 in LinuxONE Community Cloud: big-endian s390x, over 900 payments a second in one process, usually well under a millisecond each. I benchmarked the on-chip AI accelerator honestly: for this small model the CPU was faster, so that's what I ship. No data leaves the platform.</p>
-</div>
-
-<div class="scene">
-  <div class="hd"><b>9 · Close</b><span>2:42–2:50 · 8 s</span></div>
-  <p class="do">Back to Sam's app, then the title card.</p>
+  <div class="hd"><b>11 · Close</b><span>2:45–2:52 · 7 s</span></div>
+  <p class="do">Slide 13.</p>
   <p class="say">SafePay: the money gets through, the abuse doesn't, and the evidence does. Thank you.</p>
 </div>
 
 <div class="page-break"></div>
 <h2 style="margin-top:0">Recording with Clipchamp (built into Windows 11)</h2>
 <ol>
-  <li>Start → type <b>Clipchamp</b> → <i>Create a new video</i> → <i>Record &amp; create</i> → <b>Screen and camera</b> (or just <b>Screen</b> if you'd rather not appear). Allow the camera and microphone, and pick the Edge window.</li>
+  <li>Start → type <b>Clipchamp</b> → <i>Create a new video</i> → <i>Record &amp; create</i> → <b>Screen and camera</b> (or just <b>Screen</b> if you'd rather not appear). Allow the camera and microphone, and pick the Edge window that has the deck and demo tabs, so switching tabs mid-take is recorded too.</li>
   <li><b>One scene per take.</b> Pause for a second before and after speaking; it makes trimming easy. A mistake then costs 20 seconds, not 3 minutes.</li>
-  <li>Record scene 8 (the terminal) as its own <b>Screen</b> take of the terminal window.</li>
-  <li>Drag the takes onto the timeline in order and trim the gaps. If you used the camera, shrink it to a small circle in the empty area under the middle panel, so it never covers Sam's app or the IBM z17 chip.</li>
-  <li><i>Text</i> → add the title card for the first 5 seconds: <b>SafePay · IBM Z Datathon 2026 · SSF2026</b>.</li>
+  <li>Drag the takes onto the timeline in order and trim the gaps. If you used the camera, shrink it to a small circle in the empty area under the demo's middle panel, so it never covers Sam's app or a slide's numbers.</li>
   <li>Check the length on the timeline: <b>3:00 or less.</b></li>
   <li><i>Export</i> → <b>1080p</b>. Watch the whole file once.</li>
   <li>Upload to YouTube as <b>Unlisted</b> (or Google Drive shared with <i>Anyone with the link</i>) and paste the link into Hack2Skill.</li>
