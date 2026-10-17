@@ -32,7 +32,10 @@ class Screener:
         self.model_version = rel_bundle.get("version", "dev")
         self.persist = True
         for row in store.load_states():
-            self.engine.states[(row["sender"], row["recipient"])] = PairState.from_json(row["state"])
+            raw = row["state"]
+            if not raw.startswith("{"):          # encrypted at rest (all states written by this version)
+                raw = privacy.open(raw, f"pair:{row['sender']}:{row['recipient']}")
+            self.engine.states[(row["sender"], row["recipient"])] = PairState.from_json(raw)
         for h in store.q("SELECT * FROM hides"):
             self.engine.hide(h["recipient"], h["sender"], h["ts"])
 
@@ -78,15 +81,18 @@ class Screener:
         case_id = case["id"] if case else None
         new_case = False
         if not presubmit:
+            if p.reference and st.history:
+                st.history[-1][3] = d.message == "HIDE"
             if d.case in ("open", "update") or (case and d.message == "HIDE"):
                 new_case = case is None
                 case_id = self.store.open_or_update(s, r, p.created.timestamp(), d.priority or (case or {}).get("priority", "P3"),
                                                     score, d.reasons)
                 if new_case:
-                    # The messages just before the case opened are part of the pattern.
-                    for ts, ref in st.buffer[:-1] if p.reference else st.buffer:
+                    # The messages before the case opened are part of the pattern, and of the victim's record.
+                    for ts, amt, ref, was_hidden in (st.history[:-1] if p.reference else st.history):
                         h, t = self.engine.score_text(ref)
-                        self.store.add_evidence(case_id, ts, 0.0, self.privacy.seal(ref, f"case:{case_id}"), h, t, False)
+                        self.store.add_evidence(case_id, ts, amt, self.privacy.seal(ref, f"case:{case_id}"), h, t,
+                                                bool(was_hidden))
                 elif d.priority == "P1" and case.get("priority") != "P1" and self.on_escalate:
                     self.on_escalate(case_id)
             if case_id and p.reference:
@@ -94,7 +100,8 @@ class Screener:
                 self.store.add_evidence(case_id, p.created.timestamp(), p.amount,
                                         self.privacy.seal(p.reference, ctx), harm, threat, d.message == "HIDE")
             if self.persist:
-                self.store.save_state(s, r, st.to_json())
+                # The state holds recent message text, so it is encrypted at rest like the evidence.
+                self.store.save_state(s, r, self.privacy.seal(st.to_json(), f"pair:{s}:{r}"))
             if new_case and self.on_new_case:
                 self.on_new_case(case_id)
         t_end = time.perf_counter()

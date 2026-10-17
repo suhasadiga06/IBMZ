@@ -42,7 +42,28 @@ flowchart LR
 | **Relationship model** | 23 features updated in O(1) per payment: penny-payment share, night share, replies, bursts, an escalation detector (CUSUM), contact after the victim hid the sender… Random forest on **IBM Snap ML** | Catches polite-but-menacing coercive control that no text model can see |
 | **Policy** | **Money is never blocked** (it may be child support). Only the message is withheld. **The sender is never told** once a case exists, because tipping off an abuser can escalate danger. No case on behaviour alone before 3 payments. | Built around victim-safety guidance, not just accuracy |
 | **IBM Granite 3.3 2B** | Runs locally on the VM via llama.cpp. Writes a brief for the specialist team, and gives a **second opinion** reading the messages in context | "Saw you at the gym today" scores 0.02 as a toxic message; Granite reads the pattern as stalking |
-| **Three views** | Sender's app (pre-send nudge), recipient's app ("Message hidden for your safety · View anyway · Get support", plus "hide messages from this sender"), analyst console (ranked queue, timeline, Granite brief, confirm/dismiss, audit log) | It's a product, not a notebook |
+| **Three views** | Sender's app (pre-send nudge), recipient's app ("Message hidden for your safety · View anyway · Get support", plus "hide messages from this sender", and a discreet **Message settings** screen), analyst console (ranked queue, timeline, Granite brief, the customer's safe-contact rules, confirm/dismiss, audit log) | It's a product, not a notebook |
+| **Protect, then Prove** | The victim sets how the bank may contact them safely, and can allow a **signed evidence pack** for police, a protection order or a lawyer: consent per sender, withdrawable, and tamper-evident | Detection alone doesn't help someone get a protection order. Evidence does |
+
+### The victim's side: Protect and Prove
+
+Domestic-violence services stress two things a detector alone doesn't give a victim: **contact on their terms**, and **evidence they can use**. In the recipient's app, behind a neutral "Message settings" tab:
+
+- **Safe contact.** How the bank may reach them (in the app only, phone, email, or not at all), at what times, and whether *someone else may see their phone* (neutral wording only). It's shown first in every case in the analyst console, and stored encrypted, because a note like "my partner checks my phone" is itself sensitive.
+- **Quick exit.** One tap, or Esc, instantly replaces the screen with an ordinary account view and removes the safety screen from the page.
+- **Support.** 1800RESPECT (1800 737 732, 24/7), emergency 000, and a confidential in-app line to the specialist team.
+- **Consent to a record, per sender.** "Allow a record" for police, a protection order or legal advice. It can be withdrawn at any time, after which no new pack can be made.
+
+With that consent, an analyst can prepare a **signed evidence pack**:
+
+| Property | How |
+|---|---|
+| **Facts, not AI** | The timeline comes from the stored evidence: every payment's time, amount, message, whether it was withheld, and the scores. Granite's brief is attached only as *"AI draft, not checked by a person"*. Model scores are labelled as model outputs, not findings of fact. |
+| **The history before the case** | Each relationship keeps its last 20 references (encrypted), so the record starts with the first message, not the moment the case opened. In the coercive-control demo, all 8 messages are there, including the 2 sent before the case opened. |
+| **Tamper-evident storage** | The evidence log is a SHA-256 hash chain per case. Editing or deleting any stored row breaks every hash after it, and a pack is refused if the chain doesn't verify. |
+| **Tamper-evident pack** | Canonical JSON, a SHA-256 fingerprint and an **Ed25519 signature** with the bank's key. Anyone with the bank's public key can check it. In the demo, adding *one full stop* to one message makes verification fail. |
+| **Minimal disclosure** | The victim's safe-contact preferences and notes are never in the pack. Parties appear as the bank's pseudonymous references, which the bank resolves under its own legal process. |
+| **Accountable** | Creating and viewing a pack, consent changes and preference changes are all audit-logged. |
 
 ## Results
 
@@ -161,17 +182,18 @@ Threats are rare and hard to pin down from text alone. That's exactly why the re
 
 | | Result |
 |---|---|
-| Full screening path in one process (message → joined → state → relationship → policy → SQLite write) | **699 payments/s**, median 0.31 ms, p99 7.4 ms |
-| Same, over HTTP with real ISO 20022 XML | **549 requests/s**, median 0.81 ms, p99 7.3 ms |
+| Full screening path in one process (message → joined → state → relationship → policy → encrypt state → SQLite write) | **922 payments/s**, median 0.27 ms, p99 5.8 ms (an earlier run, before state encryption: 699/s, p99 7.4 ms; runs vary a lot on this shared VM) |
+| Same, over HTTP with real ISO 20022 XML | **615 requests/s**, median 0.72 ms, p99 5.9 ms |
 | Relationship model, Snap ML compressed trees on CPU | **12 µs** per payment |
-| Relationship model, Snap ML on the **on-chip AI accelerator** (zDNN) | 61 µs per payment |
-| IBM Granite 3.3 2B, Q4_K_M, on the CPU's vector units, 3 threads | 11.8 prompt tokens/s, 1.34 generated tokens/s |
+| Relationship model, Snap ML on the **on-chip AI accelerator** (zDNN) | 61–98 µs per payment |
+| IBM Granite 3.3 2B, Q4_K_M, on the CPU's vector units, 3 threads | 11.8 prompt tokens/s, 1.34 generated tokens/s. With the lab notebook container also running on the 8 GB VM: 3.8 and 0.41 (220 s per brief), as Linux evicts the memory-mapped model |
 
 - **We measured instead of assuming.** The VM exposes the Telum II AI accelerator (`nnpa` in `/proc/cpuinfo`), and Snap ML's automatic choice picks it. For our small forest on this shared 3-core VM, the CPU engine was 5× faster, so the service uses whichever engine the benchmark measured as fastest (`artifacts/benchmark.json`). The accelerator path is one setting away for larger models.
 - **Big-endian, natively.** The stack runs on Ubuntu's native s390x builds of numpy, SciPy and scikit-learn, because PyPI has no s390x wheels for them. Granite's GGUF file was converted to big-endian with llama.cpp's converter.
 - **H2O's model scorer isn't big-endian safe.** Scoring CBA's H2O MOJO models on s390x fails: a tree split on feature 33 (`0x0021`) is read as 8448 (`0x2100`), with `ArrayIndexOutOfBoundsException: Index 8448 out of bounds for length 53`. The same jar and model score fine on x86, so that one step ran on x86. It's a real portability issue for banks moving H2O models onto IBM Z.
 - **Toolchain notes we hit.** Ubuntu 24.04's GCC 13 can't target the z17 (`-march=arch15` needs GCC 15), so llama.cpp is built for z16, which the z17 runs natively. llama.cpp's own zDNN backend only accelerates FP16/FP32 models, and Granite in FP16 (~5 GB) doesn't fit beside everything else in 8 GB RAM, so Granite runs on the vector units.
-- **Data never leaves the platform.** Models, Granite, the case store and the audit log all run on the same LinuxONE system. Account numbers are replaced by keyed HMAC tokens on arrival, and evidence is encrypted with AES-256-GCM, bound to its case. There's no external AI API.
+- **Data never leaves the platform.** Models, Granite, the case store and the audit log all run on the same LinuxONE system. Account numbers are replaced by keyed HMAC tokens on arrival. Message text is encrypted with AES-256-GCM everywhere it's stored (evidence, relationship state, victim preferences), each ciphertext bound to its record. Evidence packs are signed with Ed25519. There's no external AI API.
+- **Where IBM Z's hardware would take over in production.** The AES and HMAC keys and the Ed25519 signing key are files on this VM. A bank would keep them in a hardware security module, such as IBM Z's Crypto Express adapters, so even administrators can't export the key that signs evidence for court.
 - **Containerised.** The `Containerfile` builds an s390x image with Podman.
 - **Granite stays off the payment path.** At 1.3 tokens/s on 3 shared cores, a brief takes 1–2 minutes, so Granite runs in a background queue, and is re-run when a case escalates to P1.
 
@@ -200,11 +222,11 @@ From your laptop:
 ssh -N -L 8090:127.0.0.1:8090 linux1@<vm-ip>
 ```
 
-Then open http://localhost:8090 (live demo), `/analyst` (specialist console) and `/system` (every number above, read from the training and benchmark outputs).
+Then open http://localhost:8090 (live demo; the recipient's **Message settings** tab is the victim's side), `/analyst` (specialist console, where a case with consent offers **Prepare signed evidence pack**), `/pack/{id}` (the printable pack, with Verify and Simulate tampering), and `/system` (every number above, read from the training and benchmark outputs).
 
 Container: `podman build -t safepay -f Containerfile . && bash run_safepay.sh container`
 
-Tests: `python3 -m pytest -q tests_safepay` (19 tests; the end-to-end one needs trained models).
+Tests: `python3 -m pytest -q tests_safepay` (24 tests; the two end-to-end ones need trained models). They cover the hash chain catching edits and deletions, pack signatures rejecting a one-character change or another key, consent gating and withdrawal, and that no message text or preference is readable in the database.
 
 ### API
 
@@ -215,6 +237,11 @@ Tests: `python3 -m pytest -q tests_safepay` (19 tests; the end-to-end one needs 
 | `POST /v1/recipients/hide` | Recipient's app: hide messages from this sender |
 | `GET /v1/cases`, `GET /v1/cases/{id}` | Analyst console (decrypts evidence and writes the audit log) |
 | `POST /v1/cases/{id}/label` | Confirm or dismiss, stored as labels for retraining |
+| `POST /v1/recipients/preferences` | Recipient's app: safe-contact preferences (stored encrypted) |
+| `POST /v1/recipients/consent` | Recipient's app: allow or withdraw an evidence record for one sender and purpose |
+| `POST /v1/cases/{id}/evidence-pack` | Analyst: build and sign a pack. `403` without consent, `409` if the evidence log fails its integrity check |
+| `GET /v1/packs/{id}` | Analyst: the signed pack (audit-logged) |
+| `POST /v1/packs/verify`, `GET /v1/evidence/public-key` | Anyone holding a pack (police, a court): check its fingerprint and signature |
 | `GET /healthz`, `GET /metrics` | Operations (Prometheus text format) |
 
 ## Project layout
@@ -228,8 +255,9 @@ safepay/core/engine.py      shared scoring path for training, evaluation and the
 safepay/core/relmodel.py    Model 2 on Snap ML (CPU or AI accelerator)
 safepay/core/policy.py      decisions: deliver, hide, case, nudge
 safepay/core/screener.py    the live service pipeline
-safepay/core/privacy.py     HMAC tokens, AES-GCM evidence
-safepay/core/store.py       SQLite: states, cases, evidence, hides, labels, audit
+safepay/core/privacy.py     HMAC tokens, AES-GCM for evidence, state and preferences
+safepay/core/store.py       SQLite: states, cases, hash-chained evidence, consent, packs, labels, audit
+safepay/core/evidence_pack.py  build, sign (Ed25519) and verify evidence packs
 safepay/core/granite.py     IBM Granite briefs and second opinions (background)
 safepay/sim/world.py        synthetic payment worlds
 safepay/scripts/            convert_parquet, train_text, train_rel, benchmark
@@ -240,8 +268,9 @@ safepay/app/                FastAPI service + demo, analyst and evidence pages
 
 - **Synthetic relationships.** The next step is a pilot on a bank's own (consented, pseudonymised) payment logs, with the analyst labels SafePay already collects feeding retraining.
 - **English only.** CBA's paper lists other languages as an open gap, and Granite's multilingual support is the natural route.
-- **Granite's second opinion is not yet evaluated at scale.** At 1–2 minutes per case on 3 cores we didn't get a statistically meaningful sample in the event window.
-- **The split-message window is 30 minutes, and evidence before a case opens is limited to that window.** A bank would attach full payment history.
+- **Granite's second opinion rests on small samples.** About 50 cases per world and only 10 abusive near misses in total, so it stays advisory (see above).
+- **A pack's history before the case is the last 20 messages.** A bank would attach the relationship's full payment history from its own records.
+- **A signature proves a record wasn't changed, not that it's true.** The pack also depends on the bank resolving pseudonymous references to people. Whether a court accepts it is a legal question for the bank and the victim's lawyer. The support numbers shown are Australian, to match the demo.
 
 ## Data and open-source software
 

@@ -2,8 +2,11 @@
 
 * Account numbers are replaced on arrival by keyed HMAC tokens. The models and
   the case store only ever see tokens; the bank can map back, we cannot.
-* Payment references are kept only as evidence for open cases, encrypted with
-  AES-256-GCM. Clean references are never stored.
+* Message text is encrypted with AES-256-GCM wherever it is stored: as
+  evidence for open cases, and in each relationship's state, which keeps the
+  last 20 references so a case's record can start before the case opened.
+  Each ciphertext is bound to its context (case, relationship, preferences),
+  so it cannot be moved to another record and still decrypt.
 * The key lives outside the repository (SAFEPAY_KEY_FILE, default
   ~/.safepay/key) and is created on first use.
 """

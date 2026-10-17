@@ -17,6 +17,9 @@ from datetime import datetime
 
 SPLIT_WINDOW = 30 * 60        # seconds
 SPLIT_KEEP = 8
+# Recent references kept per relationship, so that if a case opens, its record
+# starts before the case did. Stored encrypted with the rest of the state.
+HISTORY_KEEP = 20
 RATE_WINDOW = 7 * 86400
 CUSUM_K = 0.25                # harm above this level accumulates evidence
 MICRO = 1.00                  # "penny payment" cut-off in currency units
@@ -55,6 +58,7 @@ class PairState:
     burst_max: int = 0
     recent: list[float] = field(default_factory=list)      # timestamps in RATE_WINDOW
     buffer: list[list] = field(default_factory=list)       # [ts, reference] in SPLIT_WINDOW
+    history: list[list] = field(default_factory=list)      # [ts, amount, reference, hidden], last HISTORY_KEEP
 
     # -- updates ----------------------------------------------------------------
     def split_text(self, ts: float, reference: str) -> str | None:
@@ -93,6 +97,7 @@ class PairState:
             self.split_harm_max = max(self.split_harm_max, split_harm)
             self.split_threat_max = max(self.split_threat_max, split_threat)
             self.buffer = [b for b in self.buffer if ts - b[0] <= SPLIT_WINDOW][-(SPLIT_KEEP - 1):] + [[ts, reference]]
+            self.history = (self.history + [[ts, round(amount, 2), reference, False]])[-HISTORY_KEEP:]
 
     def reply(self) -> None:
         """The recipient paid the sender back: two-way contact."""
