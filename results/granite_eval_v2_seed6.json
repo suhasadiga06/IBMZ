@@ -1,0 +1,82 @@
+{
+  "meta": {
+    "threshold": 0.608838679024484,
+    "world": {
+      "relationships": 4400,
+      "payments": 43464
+    },
+    "flagged": 386,
+    "abusive": 400,
+    "caught": 384,
+    "false_alarms": 2,
+    "seed": 6
+  },
+  "n_cases": 49,
+  "granite_roc_auc": 0.9116,
+  "granite_accuracy_at_0.5": 0.8163,
+  "seconds_per_opinion": {
+    "p50": 11.4,
+    "p90": 21.3
+  },
+  "groups": {
+    "near_miss": {
+      "n": 15,
+      "abusive": 5,
+      "granite_says_abuse_when_abusive": 1,
+      "granite_says_abuse_when_innocent": 2
+    },
+    "weak_case": {
+      "n": 2,
+      "abusive": 2,
+      "granite_says_abuse_when_abusive": 2,
+      "granite_says_abuse_when_innocent": 0
+    },
+    "false_alarm": {
+      "n": 2,
+      "abusive": 0,
+      "granite_says_abuse_when_abusive": 0,
+      "granite_says_abuse_when_innocent": 1
+    },
+    "control": {
+      "n": 30,
+      "abusive": 15,
+      "granite_says_abuse_when_abusive": 15,
+      "granite_says_abuse_when_innocent": 2
+    }
+  },
+  "rules": {
+    "rescue": {
+      "new_cases": 3,
+      "of_which_abusive": 1
+    },
+    "dismiss": {
+      "dropped_cases": 0,
+      "of_which_innocent": 0
+    }
+  },
+  "whole_world": {
+    "safepay_alone": {
+      "caught": 384,
+      "false_alarms": 2
+    },
+    "with_granite_rules": {
+      "caught": 385,
+      "false_alarms": 4
+    },
+    "abusive": 400
+  },
+  "by_kind": {
+    "abusive_child_support": 0.992,
+    "account_verification": 0.0,
+    "child_support": 0.042,
+    "coercive_control": 0.74,
+    "couple_or_family": 0.0,
+    "debt_reminder": 0.002,
+    "friends": 0.238,
+    "harassment": 0.975,
+    "low_and_slow": 0.6,
+    "parent_allowance": 0.0,
+    "split_threat": 0.981
+  },
+  "relationship_model_roc_auc_same_cases": 0.9545
+}

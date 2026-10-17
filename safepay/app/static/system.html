@@ -93,6 +93,31 @@ async function main() {
       `and ${pct(msg.innocent_hidden_share)} of ${msg.innocent_messages.toLocaleString()} innocent ones. Money was delivered in every case. False-alarm bars are drawn at 5× scale.`, two));
   }
 
+  const GE = m.granite_eval_v2_seed7;
+  if (GE) {
+    const hist = [["v1 prompt", "development (seed 6)", m.granite_eval_v1_seed6], ["v2 prompt", "development (seed 6)", m.granite_eval_v2_seed6],
+                  ["v2 prompt", "fresh report (seed 7)", GE]].filter(r => r[2]).map(([v, s, d]) =>
+      [v, s, num(d.granite_roc_auc, 3), pct(d["granite_accuracy_at_0.5"]), num(d.relationship_model_roc_auc_same_cases, 3),
+       num(d.by_kind.friends, 2), `+${d.rules.rescue.of_which_abusive} / +${d.rules.rescue.new_cases - d.rules.rescue.of_which_abusive}`, num(d.seconds_per_opinion.p50, 1) + " s"]);
+    const g = GE.groups, w = GE.whole_world, rl = GE.rules;
+    const rows = Object.entries(g).map(([k, v]) => [k.replace("_", " "), v.n, v.abusive,
+      `${v.granite_says_abuse_when_abusive} / ${v.abusive}`, `${v.granite_says_abuse_when_innocent} / ${v.n - v.abusive}`]);
+    const rules = [["SafePay alone", `${w.safepay_alone.caught} / ${w.abusive}`, w.safepay_alone.false_alarms],
+                   ["SafePay + Granite rules", `${w.with_granite_rules.caught} / ${w.abusive}`, w.with_granite_rules.false_alarms]];
+    const two = el("div", null, "two"); const a = el("div"), b = el("div");
+    a.append(el("div", "Granite's verdict by group (says abuse at p ≥ 0.5)", "label"),
+      table(["Group", "Cases", "Abusive", "Abusive called abuse", "Innocent called abuse"], rows, [1, 2, 3, 4]));
+    b.append(el("div", "Whole world, with the pre-declared rules", "label"), table(["", "Caught", "False alarms"], rules, [1, 2]),
+      el("div", `Rescue: ${rl.rescue.new_cases} new cases, ${rl.rescue.of_which_abusive} abusive. Dismiss: ${rl.dismiss.dropped_cases} dropped, ${rl.dismiss.of_which_innocent} innocent.`, "note"));
+    two.append(a, b);
+    root.append(section("Does Granite's second opinion help?",
+      `${GE.n_cases} borderline and control relationships from a world no model was tuned on (seed 7). Granite sees the facts and messages but not the risk model's score. ` +
+      `${num(GE.seconds_per_opinion.p50, 1)} s per opinion (median) on 3 shared IBM Z cores, down from about 60 s. Rules were fixed before any Granite output was seen. ` +
+      `Verdict: useful to explain and to tell loan reminders from coercion, but not good enough to make or veto decisions, so SafePay keeps it advisory.`, two,
+      el("div", "Prompt versions", "label"),
+      table(["Prompt", "Cases from", "Granite AUC", "Accuracy", "Risk model AUC", "Friends' banter p", "Rescue: caught / false alarms", "Per opinion"], hist, [2, 3, 4, 5, 7])));
+  }
+
   const V = m.cba_validation;
   if (V) {
     const C = V.cba_short_any_month, S = V.safepay_same_relationships;

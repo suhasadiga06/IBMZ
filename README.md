@@ -102,6 +102,38 @@ A text-led monthly model misses abuse that hides behind polite words, legitimate
 
 Seeds 3 and 4 were used for diagnosis. Seed 5 was evaluated twice, for v3 and for the final version, and the change between them was not chosen to improve its numbers. Every version's metrics are in `results/`.
 
+### Does IBM Granite's second opinion help?
+
+Granite reads a relationship's facts and messages and answers one question: is this harassment, stalking or coercive control? It does **not** see the risk model's score, so the opinion is independent. We generate a single token (Yes/No) and use the probability Granite gives "Yes" as its score. That's both faster and measurable.
+
+**Setup.** Each evaluation uses a world no model was trained on. It includes every relationship Granite could change, plus 30 controls:
+- **Near misses:** not flagged, scoring within 0.2 below the case threshold, with at least 3 payments.
+- **Weak cases:** flagged, but with no abusive words.
+
+Two rules were fixed before seeing any output:
+- **Rescue:** a near miss becomes a case if Granite says ≥ 50%.
+- **Dismiss:** a weak case is dropped if Granite says < 20%.
+
+| Prompt | Cases from | Granite ROC AUC | Accuracy | Risk-model AUC, same cases | Friends' banter, mean p | Rescue rule: extra abusive caught / extra false alarms |
+|---|---|---|---|---|---|---|
+| v1 | seed 6 (development) | 0.907 | 73% | 0.957 | **0.59** | +3 / +7 |
+| v2 | seed 6 (development) | 0.912 | 82% | 0.955 | 0.24 | +1 / +2 |
+| v2 | **seed 7 (fresh)** | **0.989** | **93%** | 0.933 | 0.12 | **+5 / +1** |
+
+What we learned:
+- **v1 read rude banter as abuse.** "Dinner, you pig" between friends averaged 59%, and the rescue rule would have tripled false alarms. Prompt v2 states whether the relationship is two-way and tells Granite to judge the pattern, not the words.
+- **On the fresh world, v2 rescued all 5 abusive near misses for 1 extra false alarm** (382 → 387 caught of 400). On the development world it helped less (+1 / +2). Across both: +6 caught for +3 false alarms, from only 10 abusive near misses. **That's too few to trust Granite with decisions,** so SafePay keeps it advisory: it explains cases, and its probability is shown to analysts.
+- **It reads intent well where words mislead.** Debt reminders ("still waiting on the loan") average **0.00**, while coercive control averages **0.996**, even though the toxicity model scores both as harmless (0.05 and 0.08).
+
+**Speed on 3 shared IBM Z cores:**
+
+| | Before | After |
+|---|---|---|
+| Second opinion | ~60 s (JSON with a sentence) | **11 s** (one token), **0.9 s** when the prompt is cached |
+| Analyst brief | 97 s (110 tokens) | 67–79 s (80 tokens, trimmed to whole sentences) |
+
+Generation runs at about 1.2 tokens/s, which is the real limit here. So we cut the tokens, put the fixed instructions first so llama.cpp reuses its cached prompt work, and kept Granite off the payment path.
+
 ### Message model on real held-out text (Civil Comments test split, payment-length texts ≤ 140 characters)
 
 | Head | Texts | Positives | Precision | Recall | F1 | ROC AUC |
