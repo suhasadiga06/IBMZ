@@ -202,7 +202,6 @@ safepay/core/granite.py     IBM Granite briefs and second opinions (background)
 safepay/sim/world.py        synthetic payment worlds
 safepay/scripts/            convert_parquet, train_text, train_rel, benchmark
 safepay/app/                FastAPI service + demo, analyst and evidence pages
-agentguard/                 our earlier prototype (AI-assistant firewall), kept as a fallback
 ```
 
 ## Limitations and next steps
