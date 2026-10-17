@@ -1,0 +1,64 @@
+{
+  "platform": {
+    "machine": "s390x",
+    "python": "3.12.3",
+    "CPU(s)": "3",
+    "Model name": "-",
+    "Machine type": "9175",
+    "ibm_z": "IBM z17"
+  },
+  "engine": "snapml",
+  "features": 23,
+  "tree_formats": {
+    "compress_trees": {
+      "reported": "compress_trees",
+      "single_reading_us": 12.49,
+      "batch_us_per_reading": {
+        "32": 4.7,
+        "256": 1.962,
+        "4096": 1.784
+      },
+      "max_abs_diff_vs_unoptimised": 0.0
+    },
+    "zdnn_tensors": {
+      "reported": "zdnn_tensors",
+      "single_reading_us": 110.72,
+      "batch_us_per_reading": {
+        "32": 17.919,
+        "256": 9.166,
+        "4096": 11.146
+      },
+      "max_abs_diff_vs_unoptimised": 0.0
+    }
+  },
+  "fastest_single_reading": "compress_trees",
+  "pipeline": {
+    "readings": 17200,
+    "tree_format": "auto",
+    "us_p50": 94.2,
+    "us_p99": 1199.1,
+    "readings_per_second_one_core": 5454
+  },
+  "granite_notes": {
+    "model": "granite-3.3-2b-instruct Q4_K_M (big-endian), llama.cpp, shared with SafePay",
+    "max_tokens": 50,
+    "runs": [
+      {
+        "seconds": 41.8,
+        "prompt_tokens_processed": 1,
+        "prompt_seconds": 1.6,
+        "tokens_generated": 50,
+        "tokens_per_second": 1.22,
+        "note": "Unusual about this charge: The unusually close reading of the gun temperature sensors (40 and 41 \u00b0C) and the high energy consumption (3.0 kWh) at minute 4, compared to the usual risk profile"
+      },
+      {
+        "seconds": 41.0,
+        "prompt_tokens_processed": 1,
+        "prompt_seconds": 0.8,
+        "tokens_generated": 50,
+        "tokens_per_second": 1.22,
+        "note": "Unusual about this charge: The gun battery temperature is significantly higher than usual for this charging session, a factor not typically observed in 99.5% of normal charges."
+      }
+    ]
+  }
+}
