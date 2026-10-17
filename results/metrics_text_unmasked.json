@@ -1,0 +1,122 @@
+{
+  "fit_seconds": 303.9,
+  "ms_per_message_batch": 0.201,
+  "thresholds": {
+    "harm": 0.7526,
+    "threat": 0.7296
+  },
+  "rows": {
+    "train": 260000,
+    "val": 61370,
+    "test": 62076,
+    "test_short": 36220
+  },
+  "harm": {
+    "test_all": {
+      "n": 62076,
+      "positives": 5223,
+      "precision": 0.696,
+      "recall": 0.6672,
+      "f1": 0.6813,
+      "roc_auc": 0.9552,
+      "false_positive_rate": 0.0268
+    },
+    "test_payment_length": {
+      "n": 36220,
+      "positives": 2883,
+      "precision": 0.7077,
+      "recall": 0.6844,
+      "f1": 0.6958,
+      "roc_auc": 0.9584,
+      "false_positive_rate": 0.0244
+    }
+  },
+  "threat": {
+    "test_all": {
+      "n": 62076,
+      "positives": 195,
+      "precision": 0.248,
+      "recall": 0.4769,
+      "f1": 0.3263,
+      "roc_auc": 0.9661,
+      "false_positive_rate": 0.0046
+    },
+    "test_payment_length": {
+      "n": 36220,
+      "positives": 151,
+      "precision": 0.2904,
+      "recall": 0.5232,
+      "f1": 0.3735,
+      "roc_auc": 0.9748,
+      "false_positive_rate": 0.0054
+    }
+  },
+  "robustness": {
+    "n": 5223,
+    "recall_clean": 0.6672,
+    "recall_evasion_with_canonicaliser": 0.6636,
+    "recall_evasion_without_canonicaliser": 0.602
+  },
+  "fairness": {
+    "templates": 76564,
+    "nontoxic": 38282,
+    "fpr_all_nontoxic": 0.1207,
+    "recall_toxic_templates": 0.807,
+    "auc": 0.9391,
+    "worst_terms_fpr": {
+      "gay": 0.9974,
+      "homosexual": 0.9683,
+      "black": 0.8864,
+      "lesbian": 0.8745,
+      "muslim": 0.7622,
+      "transgender": 0.6196,
+      "bisexual": 0.6182,
+      "white": 0.3514
+    },
+    "per_term_fpr": {
+      "lesbian": 0.8745,
+      "gay": 0.9974,
+      "bisexual": 0.6182,
+      "transgender": 0.6196,
+      "trans": 0.0172,
+      "queer": 0.0,
+      "lgbt": 0.0,
+      "lgbtq": 0.0,
+      "homosexual": 0.9683,
+      "straight": 0.0,
+      "heterosexual": 0.0,
+      "nonbinary": 0.0,
+      "african american": 0.0,
+      "african": 0.0007,
+      "black": 0.8864,
+      "white": 0.3514,
+      "european": 0.0,
+      "hispanic": 0.0,
+      "latino": 0.0,
+      "latina": 0.0,
+      "latinx": 0.0,
+      "mexican": 0.0053,
+      "asian": 0.0,
+      "indian": 0.0026,
+      "middle eastern": 0.0,
+      "chinese": 0.0,
+      "japanese": 0.0,
+      "christian": 0.0,
+      "muslim": 0.7622,
+      "jewish": 0.0013,
+      "buddhist": 0.0,
+      "catholic": 0.0,
+      "protestant": 0.0,
+      "sikh": 0.0,
+      "old": 0.0,
+      "elderly": 0.0,
+      "young": 0.0,
+      "teenage": 0.0,
+      "blind": 0.0,
+      "deaf": 0.0,
+      "paralyzed": 0.0,
+      "female": 0.0,
+      "male": 0.0
+    }
+  }
+}

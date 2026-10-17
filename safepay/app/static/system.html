@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SafePay Evidence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/common.css">
+<style>
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .tile { padding: 14px 16px; }
+  .tile .big { font-size: 28px; font-weight: 700; letter-spacing: -.02em; }
+  .tile .sub { font-size: 13px; color: var(--muted); }
+  section { margin-top: 18px; }
+  section > .card { padding: 16px; overflow-x: auto; }
+  h2 { font-size: 17px; margin: 0 0 4px; }
+  .lede { color: var(--muted); margin: 0 0 12px; font-size: 14px; }
+  .bar { height: 8px; background: var(--chip); border-radius: 4px; min-width: 120px; position: relative; }
+  .bar i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--ink); }
+  .bar.bad i { background: var(--bad); } .bar.good i { background: var(--good); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .note { color: var(--muted); font-size: 12.5px; margin-top: 8px; }
+  @media (max-width: 1000px) { .tiles { grid-template-columns: repeat(2, 1fr); } .two { grid-template-columns: 1fr; } }
+  @media (max-width: 520px) { .tiles { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div><h1>SafePay · Evidence</h1><small>Every number below was measured on this machine and is read from the training and benchmark outputs.</small></div></div>
+  <nav><a href="/">Live demo</a><a href="/analyst">Analyst console</a><a href="/system" class="on">Evidence &amp; IBM Z</a></nav>
+</header>
+<div class="wrap" id="root"><div class="muted">Loading…</div></div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+function el(tag, text, cls) { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; }
+const pct = v => v == null ? "–" : (100 * v).toFixed(1) + "%";
+const num = (v, d = 2) => v == null ? "–" : Number(v).toFixed(d);
+const hrs = h => h == null ? "–" : h < 48 ? h.toFixed(1) + " h" : (h / 24).toFixed(1) + " days";
+
+function table(head, rows, numeric = []) {
+  const t = el("table"), hr = el("tr");
+  head.forEach((h, i) => hr.append(el("th", h, numeric.includes(i) ? "num" : "")));
+  t.append(hr);
+  for (const r of rows) { const tr = el("tr"); r.forEach((c, i) => { const td = el("td", null, numeric.includes(i) ? "num" : ""); if (c instanceof Node) td.append(c); else td.textContent = c; tr.append(td); }); t.append(tr); }
+  return t;
+}
+function bar(v, cls = "") { const b = el("div", null, "bar " + cls); const i = el("i"); i.style.width = Math.max(0, Math.min(1, v)) * 100 + "%"; b.append(i); b.title = pct(v); return b; }
+function section(title, lede, ...kids) { const s = el("section"); const c = el("div", null, "card"); c.append(el("h2", title)); if (lede) c.append(el("p", lede, "lede")); c.append(...kids); s.append(c); return s; }
+function tile(big, label, sub) { const t = el("div", null, "card tile"); t.append(el("div", label, "label"), el("div", big, "big"), el("div", sub || "", "sub")); return t; }
+
+async function main() {
+  const [sys, m] = await Promise.all([fetch("/api/system").then(r => r.json()), fetch("/api/model-metrics").then(r => r.json())]);
+  const root = $("#root"); root.textContent = "";
+  const R = m.metrics_rel, T = m.metrics_text, U = m.metrics_text_unmasked, B = m.benchmark;
+  const ours = R?.safepay_realtime, base = R?.cba_style_monthly;
+
+  const tiles = el("div", null, "tiles");
+  tiles.append(tile(sys.cpu.replace(/ \(.*/, ""), "Hardware", `${sys.machine} · ${sys.byteorder}-endian · ${sys.cores} cores`));
+  if (ours && base) tiles.append(tile(hrs(ours.delay_hours_median), "Median time to catch abuse", `vs ${hrs(base.delay_hours_median)} with monthly batch scoring`));
+  if (B) tiles.append(tile(Math.round(B.pipeline.payments_per_second).toLocaleString() + "/s", "Payments screened per second", `p99 ${num(B.pipeline.latency_ms.p99, 2)} ms each, one process`));
+  if (T) tiles.append(tile(pct(T.fairness.worst_terms_fpr ? Math.max(...Object.values(T.fairness.worst_terms_fpr)) : null), "Worst identity-term false alarms", U ? `was ${pct(Math.max(...Object.values(U.fairness.worst_terms_fpr)))} before masking` : ""));
+  root.append(tiles);
+
+  if (ours && base) {
+    const rows = [["Abusive relationships caught", `${ours.caught} / ${ours.abusive_relationships}`, `${base.caught} / ${base.abusive_relationships}`],
+      ["Precision (cases that are real abuse)", pct(ours.precision), pct(base.precision)],
+      ["F1", num(ours.f1), num(base.f1)],
+      ["False alarms per 10,000 innocent relationships", num(ours.false_alarms_per_10k_innocent, 1), num(base.false_alarms_per_10k_innocent, 1)],
+      ["Median time from first abusive payment to case", hrs(ours.delay_hours_median), hrs(base.delay_hours_median)],
+      ["90th percentile time to case", hrs(ours.delay_hours_p90), hrs(base.delay_hours_p90)],
+      ["Caught within 24 hours", pct(ours.caught_within_24h_share), pct(base.caught_within_24h_share)]];
+    root.append(section("Real-time vs monthly batch",
+      `Test world: ${R.worlds.test.relationships.toLocaleString()} relationships, ${R.worlds.test.payments.toLocaleString()} payments, ${R.worlds.test.abusive} abusive. ` +
+      `Built from Civil Comments test-split text and phrases the models never saw. The baseline follows Commonwealth Bank's published method ` +
+      `(monthly relationship aggregates, random forest) using the same message model, so the difference comes from real-time relationship scoring.`,
+      table(["", "SafePay (real-time)", "CBA-style (monthly)"], rows, [1, 2])));
+
+    const kinds = Object.keys(ours.flag_rate_by_kind).filter(k => !k.endsWith("_reverse"));
+    const abusiveKinds = ["harassment", "split_threat", "coercive_control", "abusive_child_support", "low_and_slow"];
+    const ab = kinds.filter(k => abusiveKinds.includes(k)), inn = kinds.filter(k => !abusiveKinds.includes(k));
+    const two = el("div", null, "two");
+    const left = el("div"); left.append(el("div", "Abusive kinds: share caught", "label"),
+      table(["Kind", "SafePay", "", "Monthly"], ab.map(k => [k.replace(/_/g, " "), pct(ours.flag_rate_by_kind[k]), bar(ours.flag_rate_by_kind[k], "good"), pct(base.flag_rate_by_kind[k])]), [1, 3]));
+    const right = el("div"); right.append(el("div", "Innocent kinds: false-alarm rate", "label"),
+      table(["Kind", "SafePay", "", "Monthly"], inn.map(k => [k.replace(/_/g, " "), pct(ours.flag_rate_by_kind[k]), bar(ours.flag_rate_by_kind[k] * 5, "bad"), pct(base.flag_rate_by_kind[k])]), [1, 3]));
+    two.append(left, right);
+    const msg = ours.messages;
+    root.append(section("Who it catches, and who it bothers",
+      `Messages withheld as they arrived: ${pct(msg.abusive_hidden_share)} of ${msg.abusive_messages.toLocaleString()} abusive-relationship messages, ` +
+      `and ${pct(msg.innocent_hidden_share)} of ${msg.innocent_messages.toLocaleString()} innocent ones. Money was delivered in every case. False-alarm bars are drawn at 5× scale.`, two));
+  }
+
+  if (T) {
+    const H = T.harm.test_payment_length, TH = T.threat.test_payment_length, rb = T.robustness;
+    const rows = [["Harm (abusive, harassing)", H.n.toLocaleString(), H.positives.toLocaleString(), num(H.precision), num(H.recall), num(H.f1), num(H.roc_auc, 3)],
+                  ["Threat", TH.n.toLocaleString(), TH.positives.toLocaleString(), num(TH.precision), num(TH.recall), num(TH.f1), num(TH.roc_auc, 3)]];
+    const rob = table(["Test texts", "Recall"], [["Clean toxic texts", pct(rb.recall_clean)], ["Same texts with evasion tricks, no canonicaliser", pct(rb.recall_evasion_without_canonicaliser)],
+      ["Same texts with evasion tricks, with canonicaliser", pct(rb.recall_evasion_with_canonicaliser)]], [1]);
+    const two = el("div", null, "two"); const a = el("div"), b = el("div");
+    a.append(el("div", "Evasion tricks: l33t, d.o.t.s, s p a c e s, look-alike letters, emoji", "label"), rob);
+    const terms = Object.keys(T.fairness.per_term_fpr).filter(t => U && U.fairness.per_term_fpr[t] != null)
+      .sort((x, y) => U.fairness.per_term_fpr[y] - U.fairness.per_term_fpr[x]).slice(0, 8);
+    b.append(el("div", "False alarms on harmless sentences mentioning a group (Jigsaw templates)", "label"),
+      table(["Term", "Before masking", "", "After"], terms.map(t => [t, pct(U.fairness.per_term_fpr[t]), bar(U.fairness.per_term_fpr[t], "bad"), pct(T.fairness.per_term_fpr[t])]), [1, 3]));
+    two.append(a, b);
+    root.append(section("Message model, on real held-out text",
+      `Civil Comments test split, texts of payment length (≤140 characters). Thresholds were tuned on the validation split. ` +
+      `${T.rows.train.toLocaleString()} training texts, ${num(T.ms_per_message_batch, 3)} ms per message in batch.`,
+      table(["Head", "Texts", "Positives", "Precision", "Recall", "F1", "ROC AUC"], rows, [1, 2, 3, 4, 5, 6]), two));
+  }
+
+  if (B) {
+    const P = B.pipeline;
+    const rows = [["Full screening path (message + joined + state + relationship + policy + SQLite write)", P.payments.toLocaleString(), Math.round(P.payments_per_second).toLocaleString(), num(P.latency_ms.p50, 3), num(P.latency_ms.p99, 3)]];
+    if (B.http) rows.push(["Same, over HTTP with ISO 20022 XML", B.http.requests.toLocaleString(), Math.round(B.http.requests_per_second).toLocaleString(), num(B.http.latency_ms.p50, 2), num(B.http.latency_ms.p99, 2)]);
+    const fm = Object.entries(B.tree_formats).map(([f, v]) => [f === "zdnn_tensors" ? "On-chip AI accelerator (zDNN)" : f === "compress_trees" ? "CPU, Snap ML compressed trees" : f, num(v.single_us, 1) + " µs", num(v.batch_us_per_row, 2) + " µs"]);
+    root.append(section("Speed on IBM Z",
+      `Measured on this ${sys.cpu}. Relationship model: Snap ML ${R?.chosen || ""}. The service uses "${sys.tree_format}". ` +
+      (B.granite ? `Granite 3.3 2B (Q4_K_M, big-endian GGUF) via llama.cpp on the CPU's vector units: ${num(B.granite.prompt_tokens_per_second, 1)} prompt tokens/s, ${num(B.granite.generate_tokens_per_second, 1)} generated tokens/s.` : ""),
+      table(["Path", "Payments", "Per second", "p50 ms", "p99 ms"], rows, [1, 2, 3, 4]),
+      el("div", "Relationship model inference, by engine", "label"), table(["Engine", "One payment", "Per payment in a batch of 1,000"], fm, [1, 2]),
+      el("div", B.notes || "", "note")));
+  }
+
+  root.append(section("Data and licences", null, table(["Source", "Used for", "Licence"], [
+    ["google/civil_comments (Hugging Face)", "Message model training, tuning and test; real message text in the simulated worlds", "CC0-1.0"],
+    ["conversationai/unintended-ml-bias-analysis", "Identity-term fairness test (never used for training)", "Apache-2.0"],
+    ["Synthetic payment worlds (this project, fixed seeds)", "Relationship timelines; no public data exists, by design", "—"],
+    ["IBM Granite 3.3 2B Instruct (GGUF)", "Analyst briefs and second opinions, run locally", "Apache-2.0"]])));
+}
+main().catch(e => { $("#root").textContent = "Could not load metrics: " + e.message; });
+</script>
+</body>
+</html>

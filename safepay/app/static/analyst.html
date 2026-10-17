@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SafePay Analyst Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/common.css">
+<style>
+  .grid { display: grid; grid-template-columns: minmax(340px, 440px) 1fr; gap: 18px; align-items: start; }
+  .queue { padding: 0; overflow: hidden; }
+  .queue .head { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; gap: 8px; flex-wrap: wrap; }
+  .queue table tr { cursor: pointer; }
+  .queue table tr:hover td { background: var(--chip); }
+  .queue table tr.on td { background: var(--accent-bg); }
+  .qwrap { max-height: 72vh; overflow: auto; }
+  .detail { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+  .fact { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .fact .v { font-weight: 600; font-size: 15px; }
+  .fact .k { font-size: 12px; color: var(--muted); }
+  .ai { border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; padding: 12px 14px; }
+  .ai p { margin: 6px 0 0; }
+  .ai .by { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chart { position: relative; }
+  .chart svg { width: 100%; height: 220px; display: block; }
+  .tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow);
+         border-radius: 6px; padding: 6px 9px; font-size: 12.5px; max-width: 280px; display: none; z-index: 2; }
+  .legend { display: flex; gap: 14px; font-size: 12.5px; color: var(--muted); margin-top: 4px; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+  .evtable { max-height: 300px; overflow: auto; }
+  .empty { color: var(--muted); padding: 40px; text-align: center; }
+  .reasons { margin: 4px 0 0; padding-left: 18px; font-size: 14px; }
+  @media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div><h1>SafePay · Specialist team</h1><small>Cases ranked by risk. Message text is decrypted only here, and every view is audit-logged.</small></div></div>
+  <nav><a href="/">Live demo</a><a href="/analyst" class="on">Analyst console</a><a href="/system">Evidence &amp; IBM Z</a></nav>
+</header>
+<div class="wrap">
+  <div class="grid">
+    <div class="card queue">
+      <div class="head"><div><b>Review queue</b> <span class="muted" id="qcount"></span></div>
+        <div style="display:flex;gap:6px;align-items:center"><span class="muted" id="bg" style="font-size:12.5px"></span>
+          <button class="btn ghost" id="loadBg" title="Replay a fresh synthetic world through the screening service">Load background traffic</button></div></div>
+      <div class="qwrap"><table><thead><tr><th>#</th><th>Priority</th><th>Risk</th><th>Messages</th><th>Main reason</th></tr></thead><tbody id="rows"></tbody></table></div>
+    </div>
+    <div class="card detail" id="detail"><div class="empty">Select a case.</div></div>
+  </div>
+  <div class="card" style="margin-top:18px;padding:14px">
+    <div class="label">Audit log</div>
+    <div style="max-height:200px;overflow:auto"><table><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Case</th></tr></thead><tbody id="audit"></tbody></table></div>
+  </div>
+</div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+function el(tag, text, cls) { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; }
+async function api(path, opts) { const r = await fetch(path, opts); if (!r.ok) throw new Error(path + " " + r.status); return r.json(); }
+const post = (p, b) => api(p, {method: "POST", headers: {"Content-Type": "application/json", "X-Analyst": "analyst-demo"}, body: b ? JSON.stringify(b) : undefined});
+const fmt = ts => new Date(ts * 1000).toLocaleString(undefined, {month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"});
+let current = null, poll = null;
+
+async function queue() {
+  const cs = await api("/v1/cases");
+  $("#qcount").textContent = cs.length ? `· ${cs.length} cases` : "";
+  const tb = $("#rows"); tb.textContent = "";
+  if (!cs.length) { const tr = el("tr"); const td = el("td", "No cases yet. Replay a scenario on the demo page, or load background traffic.", "muted"); td.colSpan = 5; tr.append(td); tb.append(tr); }
+  for (const c of cs) {
+    const tr = el("tr"); if (c.id === current) tr.className = "on";
+    const pr = el("td"); pr.append(el("span", c.priority || "P3", "tag " + (c.priority || "P3")));
+    tr.append(el("td", c.id), pr, el("td", c.score.toFixed(2)), el("td", c.n_evidence), el("td", (c.reasons[0] || "").slice(0, 70)));
+    if (c.label) tr.lastChild.append(el("span", " · " + c.label.replace("_", " "), "muted"));
+    tr.onclick = () => open(c.id); tb.append(tr);
+  }
+}
+
+function chart(ev, hiddenAt, harmLimit) {
+  const W = 760, H = 220, L = 40, R = 12, T = 12, B = 28;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", "Timeline of payment messages, harm score by time");
+  const ns = (t, a) => { const e = document.createElementNS("http://www.w3.org/2000/svg", t); for (const k in a) e.setAttribute(k, a[k]); return e; };
+  if (!ev.length) return svg;
+  const t0 = Math.min(...ev.map(e => e.ts)), t1 = Math.max(...ev.map(e => e.ts), t0 + 3600);
+  const x = t => L + (W - L - R) * (t - t0) / (t1 - t0), y = v => T + (H - T - B) * (1 - v);
+  for (const v of [0, .5, 1]) {
+    svg.append(ns("line", {x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: "var(--line)", "stroke-width": 1}));
+    const tx = ns("text", {x: L - 8, y: y(v) + 4, "text-anchor": "end", "font-size": 11, fill: "var(--muted)"}); tx.textContent = v.toFixed(1); svg.append(tx);
+  }
+  svg.append(ns("line", {x1: L, x2: W - R, y1: y(harmLimit), y2: y(harmLimit), stroke: "var(--muted)", "stroke-width": 1, "stroke-dasharray": "4 4"}));
+  const lim = ns("text", {x: W - R, y: y(harmLimit) - 5, "text-anchor": "end", "font-size": 11, fill: "var(--muted)"}); lim.textContent = "harm limit"; svg.append(lim);
+  if (hiddenAt && hiddenAt >= t0 && hiddenAt <= t1) {
+    svg.append(ns("line", {x1: x(hiddenAt), x2: x(hiddenAt), y1: T, y2: H - B, stroke: "var(--accent)", "stroke-width": 2}));
+    const ht = ns("text", {x: x(hiddenAt) + 5, y: T + 11, "font-size": 11, fill: "var(--ink)"}); ht.textContent = "recipient hid sender"; svg.append(ht);
+  }
+  for (const [i, t] of [[0, t0], [1, t1]].entries()) {
+    const tx = ns("text", {x: i ? W - R : L, y: H - 8, "text-anchor": i ? "end" : "start", "font-size": 11, fill: "var(--muted)"});
+    tx.textContent = fmt(t[1]); svg.append(tx);
+  }
+  const tip = $("#tip");
+  for (const e of ev) {
+    const v = Math.max(e.harm, e.threat);
+    const g = ns("g", {});
+    g.append(ns("circle", {cx: x(e.ts), cy: y(v), r: 12, fill: "transparent"}));
+    g.append(ns("circle", {cx: x(e.ts), cy: y(v), r: 4.5, fill: e.hidden ? "var(--bad)" : "var(--muted)", stroke: "var(--panel)", "stroke-width": 2}));
+    g.onmouseenter = ev2 => {
+      tip.textContent = ""; tip.append(el("b", fmt(e.ts) + " · $" + e.amount.toFixed(2)), el("div", "“" + e.reference + "”"),
+        el("div", `harm ${e.harm.toFixed(2)} · threat ${e.threat.toFixed(2)} · ${e.hidden ? "withheld" : "shown"}`, "muted"));
+      const box = svg.getBoundingClientRect(), sx = box.width / W;
+      tip.style.left = Math.min(x(e.ts) * sx + 10, box.width - 290) + "px"; tip.style.top = (y(v) * sx - 10) + "px"; tip.style.display = "block";
+    };
+    g.onmouseleave = () => { tip.style.display = "none"; };
+    svg.append(g);
+  }
+  return svg;
+}
+
+async function open(id) {
+  current = id; clearInterval(poll);
+  const d = await api("/v1/cases/" + id, {headers: {"X-Analyst": "analyst-demo"}});
+  const c = d.case, box = $("#detail"); box.textContent = "";
+  const head = el("div"); head.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap";
+  const h = el("div"); h.append(el("b", `Case #${c.id} `), el("span", c.priority || "P3", "tag " + (c.priority || "P3")), el("span", `  risk ${c.score.toFixed(2)} · ${c.status}`, "muted"));
+  head.append(h, el("span", "sender " + c.sender + " → recipient " + c.recipient, "mono muted"));
+  box.append(head);
+  head.lastChild.style.fontSize = "12px";
+  const ul = el("ul", null, "reasons"); for (const r of c.reasons.slice(0, 5)) ul.append(el("li", r)); box.append(ul);
+
+  const facts = el("div", null, "facts");
+  for (const [k, v] of Object.entries(d.facts)) { if (k === "model_reasons") continue; const f = el("div", null, "fact"); f.append(el("div", String(v), "v"), el("div", k.replace(/_/g, " "), "k")); facts.append(f); }
+  box.append(facts);
+
+  const cw = el("div", null, "chart"); cw.append(chart(d.evidence, d.hidden_at, 0.5), Object.assign(el("div", null, "tip"), {id: "tip"}));
+  const lg = el("div", null, "legend");
+  const a = el("span"); a.append(Object.assign(el("i"), {style: "background:var(--bad)"}), "withheld from recipient");
+  const b = el("span"); b.append(Object.assign(el("i"), {style: "background:var(--muted)"}), "shown");
+  lg.append(a, b, el("span", "height = higher of harm and threat score"));
+  const chartWrap = el("div"); chartWrap.append(el("div", "Messages over time", "label"), cw, lg); box.append(chartWrap);
+  // Re-run the chart builder so the tooltip element exists before handlers fire.
+  cw.replaceChild(chart(d.evidence, d.hidden_at, 0.5), cw.firstChild);
+
+  const ai = el("div", null, "ai"); ai.append(el("div", "Granite brief", "label"));
+  if (c.summary) {
+    ai.append(el("p", c.summary));
+    if (c.second_opinion) ai.append(el("p", `Second opinion: ${c.second_opinion.verdict.replace("_", " ")} (${c.second_opinion.confidence}) — ${c.second_opinion.why}`));
+    ai.append(el("div", "Generated by " + c.summary_by + ". Written only from the facts above; never shown to the sender.", "by"));
+  } else {
+    ai.append(el("p", "Not generated yet. Granite runs in the background queue, never on the payment path.", "muted"));
+    poll = setInterval(async () => { const x = await api("/v1/cases/" + id, {headers: {"X-Analyst": "analyst-demo"}}); if (x.case.summary && current === id) open(id); }, 5000);
+  }
+  box.append(ai);
+
+  const acts = el("div", null, "acts");
+  const yes = el("button", "Confirm abuse", "btn danger"), no = el("button", "Not abuse", "btn ghost"), g = el("button", "Ask Granite", "btn ghost");
+  yes.onclick = async () => { const r = await post(`/v1/cases/${id}/label`, {label: "abuse"}); yes.textContent = `Confirmed · ${r.labels_for_retraining} labels for retraining`; queue(); audit(); };
+  no.onclick = async () => { const r = await post(`/v1/cases/${id}/label`, {label: "not_abuse"}); no.textContent = `Marked not abuse · ${r.labels_for_retraining} labels`; queue(); audit(); };
+  g.onclick = async () => { const r = await post(`/v1/cases/${id}/granite`); g.textContent = `Queued (${r.queue_length} ahead)`; open(id); };
+  acts.append(yes, no, g); box.append(acts);
+
+  const tw = el("div", null, "evtable"); const t = el("table"); const hr = el("tr");
+  for (const x of ["When", "Amount", "Message (decrypted for review)", "Harm", "Threat", "Shown?"]) hr.append(el("th", x));
+  t.append(hr);
+  for (const e of [...d.evidence].reverse()) {
+    const tr = el("tr"); const st = el("td"); st.append(el("span", e.hidden ? "withheld" : "shown", "tag " + (e.hidden ? "hide" : "show")));
+    tr.append(el("td", fmt(e.ts)), el("td", e.amount ? "$" + e.amount.toFixed(2) : "before case", e.amount ? "" : "muted"), el("td", e.reference), el("td", e.harm.toFixed(2)), el("td", e.threat.toFixed(2)), st);
+    t.append(tr);
+  }
+  tw.append(t); const ew = el("div"); ew.append(el("div", "Evidence", "label"), tw); box.append(ew);
+  queue(); audit();
+}
+
+async function audit() {
+  const rows = await api("/v1/audit"), tb = $("#audit"); tb.textContent = "";
+  for (const a of rows.slice(0, 40)) { const tr = el("tr"); tr.append(el("td", fmt(a.ts)), el("td", a.actor), el("td", a.action.replace(/_/g, " ")), el("td", a.case_id ?? "")); tb.append(tr); }
+}
+
+$("#loadBg").onclick = async () => {
+  await post("/demo/background");
+  const t = setInterval(async () => {
+    const s = await api("/demo/background");
+    $("#bg").textContent = s.running ? `replaying ${s.done}/${s.total} payments…` : (s.total ? `replayed ${s.total} payments` : "");
+    queue(); if (!s.running) clearInterval(t);
+  }, 1500);
+};
+queue(); audit();
+const params = new URLSearchParams(location.search); if (params.get("case")) open(Number(params.get("case")));
+</script>
+</body>
+</html>

@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentGuard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4f5f7; --panel: #ffffff; --ink: #161616; --muted: #5d6470; --line: #dde1e6;
+    --bad: #da1e28; --bad-bg: #fff1f1; --good: #198038; --good-bg: #defbe6;
+    --warn: #b28600; --accent: #0f62fe; --accent-bg: #edf5ff; --chip: #eef0f3;
+    --shadow: 0 1px 2px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1116; --panel: #161b22; --ink: #e6edf3; --muted: #9aa4b2; --line: #2b323c;
+      --bad: #ff6b6b; --bad-bg: #2d1416; --good: #42be65; --good-bg: #0f2a19;
+      --warn: #f1c21b; --accent: #78a9ff; --accent-bg: #10223d; --chip: #222a35;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1116; --panel: #161b22; --ink: #e6edf3; --muted: #9aa4b2; --line: #2b323c;
+    --bad: #ff6b6b; --bad-bg: #2d1416; --good: #42be65; --good-bg: #0f2a19;
+    --warn: #f1c21b; --accent: #78a9ff; --accent-bg: #10223d; --chip: #222a35; --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 "IBM Plex Sans", system-ui, sans-serif; }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+  header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between;
+           padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
+  .brand small { color: var(--muted); }
+  .shield { width: 28px; height: 28px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { background: var(--chip); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; white-space: nowrap; }
+  .chip b { font-weight: 600; }
+  .chip.z { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+  main { display: grid; grid-template-columns: 280px 1fr; gap: 20px; padding: 20px 24px; max-width: 1500px; margin: 0 auto; }
+  aside, .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+  aside { padding: 14px; align-self: start; position: sticky; top: 12px; }
+  aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 14px 4px 6px; }
+  aside h2:first-child { margin-top: 2px; }
+  .scn { display: flex; width: 100%; text-align: left; gap: 8px; align-items: flex-start; border: 0; background: none; color: inherit;
+         padding: 7px 8px; border-radius: 6px; cursor: pointer; font: inherit; font-size: 14px; }
+  .scn:hover { background: var(--chip); }
+  .scn.active { background: var(--accent-bg); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; flex: none; }
+  .dot.attack { background: var(--bad); } .dot.benign { background: var(--good); }
+  .scn .res { margin-left: auto; font-size: 12px; flex: none; }
+  .btn { display: block; width: 100%; border: 0; border-radius: 6px; padding: 10px; font: inherit; font-weight: 600;
+         background: var(--accent); color: #fff; cursor: pointer; margin-top: 4px; }
+  .btn:disabled { opacity: .55; cursor: progress; }
+  .btn.ghost { background: var(--chip); color: var(--ink); }
+  .score { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+  .stat { padding: 14px 16px; }
+  .stat .label { color: var(--muted); font-size: 13px; }
+  .stat .big { font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+  .stat .big.bad { color: var(--bad); } .stat .big.good { color: var(--good); }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .side { padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .side h3 { margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .side.unprot { border-top: 4px solid var(--bad); } .side.prot { border-top: 4px solid var(--good); }
+  .badge { font-size: 12px; font-weight: 600; border-radius: 4px; padding: 2px 8px; margin-left: auto; text-transform: uppercase; letter-spacing: .04em; }
+  .badge.breached { background: var(--bad-bg); color: var(--bad); }
+  .badge.blocked, .badge.allowed { background: var(--good-bg); color: var(--good); }
+  .label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .box { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; font-size: 13px;
+         white-space: pre-wrap; word-break: break-word; max-height: 160px; overflow: auto; }
+  .tools { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .tools li { font-size: 13px; display: flex; gap: 8px; align-items: baseline; }
+  .tools .ok { color: var(--bad); } .tools .no { color: var(--good); }
+  .tools .why { color: var(--muted); font-size: 12px; }
+  .dmg { display: flex; gap: 8px; flex-wrap: wrap; }
+  .dmg span { font-size: 13px; padding: 3px 9px; border-radius: 4px; background: var(--chip); }
+  .dmg span.hit { background: var(--bad-bg); color: var(--bad); font-weight: 600; }
+  .layers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+  .layer { padding: 14px; border-left: 4px solid var(--line); }
+  .layer.fired { border-left-color: var(--good); }
+  .layer h4 { margin: 0 0 4px; font-size: 14px; display: flex; gap: 8px; align-items: center; }
+  .light { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+  .layer.fired .light { background: var(--good); box-shadow: 0 0 0 4px var(--good-bg); }
+  .layer p { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+  .layer .ev { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .layer .ev span { font-size: 12px; background: var(--chip); border-radius: 4px; padding: 1px 6px; }
+  .meter { height: 6px; background: var(--chip); border-radius: 3px; margin-top: 8px; position: relative; overflow: hidden; }
+  .meter i { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 3px; }
+  .meter b { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink); }
+  .report { margin-top: 16px; padding: 16px; }
+  .report pre { margin: 8px 0 0; font-size: 13px; white-space: pre-wrap; }
+  .report .gen { font-size: 12px; color: var(--muted); }
+  .metrics { margin-top: 16px; padding: 16px; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; }
+  .note { color: var(--muted); font-size: 12.5px; margin-top: 8px; }
+  textarea { width: 100%; font: 13px "IBM Plex Mono", monospace; background: var(--bg); color: var(--ink);
+             border: 1px solid var(--line); border-radius: 6px; padding: 8px; resize: vertical; }
+  .empty { color: var(--muted); padding: 40px; text-align: center; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  @media (max-width: 1000px) {
+    main { grid-template-columns: 1fr; padding: 16px; }
+    aside { position: static; }
+    .split, .layers, .score { grid-template-columns: 1fr; }
+    header { padding: 12px 16px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <svg class="shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+      <path d="M12 2.5l8 3v6c0 5-3.4 8.7-8 10-4.6-1.3-8-5-8-10v-6l8-3z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>
+    </svg>
+    <div><h1>AgentGuard</h1><small>A firewall for AI assistants, built to run on IBM Z</small></div>
+  </div>
+  <div class="chips" id="sys"><span class="chip">connecting…</span></div>
+</header>
+
+<main>
+  <aside>
+    <h2>Attacks</h2>
+    <div id="attacks"></div>
+    <h2>Normal requests</h2>
+    <div id="benign"></div>
+    <h2>Run</h2>
+    <button class="btn" id="runAll">Run all scenarios</button>
+    <details style="margin-top:12px">
+      <summary>Try your own input</summary>
+      <div style="margin-top:8px">
+        <div class="label">Customer message</div>
+        <textarea id="cMsg" rows="2">What's my balance?</textarea>
+        <div class="label" style="margin-top:6px">Document (optional, untrusted)</div>
+        <textarea id="cDoc" rows="4" placeholder="Paste any text the assistant will read"></textarea>
+        <button class="btn ghost" id="cRun">Check</button>
+      </div>
+    </details>
+  </aside>
+
+  <section>
+    <div class="score">
+      <div class="card stat"><div class="label">Attacks that breached · without AgentGuard</div><div class="big bad" id="sUn">–</div></div>
+      <div class="card stat"><div class="label">Attacks that breached · with AgentGuard</div><div class="big good" id="sPr">–</div></div>
+      <div class="card stat"><div class="label">False alarms on normal requests</div><div class="big" id="sFa">–</div></div>
+    </div>
+
+    <div id="stage"><div class="card empty">Pick a scenario on the left, or press <b>Run all scenarios</b>.</div></div>
+
+    <div class="card metrics" id="metrics"></div>
+  </section>
+</main>
+
+<template id="tplStage">
+  <div class="split">
+    <div class="card side unprot">
+      <h3>Unprotected assistant <span class="badge" data-k="uBadge"></span></h3>
+      <div><div class="label">Customer says</div><div class="box" data-k="user"></div></div>
+      <div data-k="docWrap"><div class="label">Document it reads <span data-k="src"></span></div><div class="box mono" data-k="doc"></div></div>
+      <div><div class="label">Tool calls</div><ul class="tools mono" data-k="uTools"></ul></div>
+      <div><div class="label">Reply</div><div class="box mono" data-k="uReply"></div></div>
+      <div class="dmg" data-k="uDmg"></div>
+    </div>
+    <div class="card side prot">
+      <h3>Protected by AgentGuard <span class="badge" data-k="pBadge"></span></h3>
+      <div><div class="label">Customer says</div><div class="box" data-k="user2"></div></div>
+      <div data-k="docWrap2"><div class="label">Document</div><div class="box mono" data-k="doc2"></div></div>
+      <div><div class="label">Tool calls</div><ul class="tools mono" data-k="pTools"></ul></div>
+      <div><div class="label">Reply</div><div class="box mono" data-k="pReply"></div></div>
+      <div class="dmg" data-k="pDmg"></div>
+    </div>
+  </div>
+  <div class="layers">
+    <div class="card layer" data-k="L1"><h4><span class="light"></span>1 · Input screening</h4><p data-k="L1p"></p><div class="meter" data-k="L1m"><i></i><b></b></div><div class="ev" data-k="L1e"></div></div>
+    <div class="card layer" data-k="L2"><h4><span class="light"></span>2 · Tool-call firewall</h4><p data-k="L2p"></p></div>
+    <div class="card layer" data-k="L3"><h4><span class="light"></span>3 · Output leak filter</h4><p data-k="L3p"></p></div>
+  </div>
+  <div class="card report">
+    <div class="label">Incident report <span class="gen" data-k="gen"></span></div>
+    <pre class="mono" data-k="report"></pre>
+  </div>
+</template>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const results = {};          // scenario id -> {kind, unprot, prot, falseAlarm}
+let scenarios = [];
+
+// Everything rendered from the API goes through textContent: dataset text can contain HTML.
+function el(tag, text, cls) { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; }
+const money = v => "$" + Number(v).toLocaleString(undefined, {maximumFractionDigits: 0});
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error(path + " → " + r.status);
+  return r.json();
+}
+
+async function boot() {
+  const [sys, sc] = await Promise.all([api("/api/system"), api("/api/scenarios")]);
+  const chips = $("#sys"); chips.textContent = "";
+  chips.append(el("span", sys.is_ibm_z ? "Running on " + sys.cpu + " · " + sys.machine : "Running on " + sys.machine, "chip z"));
+  chips.append(el("span", sys.byteorder + "-endian · " + sys.cores + " cores", "chip"));
+  chips.append(el("span", "GenAI: " + sys.generator, "chip"));
+  scenarios = sc;
+  for (const s of sc) {
+    const b = el("button", null, "scn"); b.dataset.id = s.id;
+    b.append(el("span", null, "dot " + s.kind), el("span", s.title), el("span", "", "res"));
+    b.onclick = () => run(s.id);
+    $(s.kind === "attack" ? "#attacks" : "#benign").append(b);
+  }
+  try { renderMetrics(await api("/api/metrics")); } catch (e) { $("#metrics").textContent = "Metrics unavailable: train the models first."; }
+}
+
+function chipsFor(r) {
+  const out = [];
+  out.push(el("span", r.leaked_values + " secret values leaked", r.leaked_values ? "hit" : ""));
+  out.push(el("span", r.emails_out + " emails out", r.emails_out ? "hit" : ""));
+  out.push(el("span", money(r.money_out) + " moved", r.money_out ? "hit" : ""));
+  return out;
+}
+
+function toolList(ul, calls) {
+  ul.textContent = "";
+  if (!calls.length) { ul.append(el("li", "(none)", "why")); return; }
+  for (const c of calls) {
+    const li = el("li");
+    const allowed = c.allowed !== false;
+    li.append(el("span", allowed ? "▶" : "✕", allowed ? "ok" : "no"));
+    const args = Object.entries(c.args || {}).map(([k, v]) => k + "=" + v).join(", ");
+    li.append(el("span", c.tool + "(" + args + ")"));
+    if (!allowed) li.append(el("span", c.reason, "why"));
+    ul.append(li);
+  }
+}
+
+function render(s, data) {
+  const node = $("#tplStage").content.cloneNode(true);
+  const k = n => node.querySelector(`[data-k="${n}"]`);
+  const U = data.unprotected, P = data.protected, L = P.layers;
+  k("user").textContent = k("user2").textContent = s.user;
+  if (s.document) {
+    k("doc").textContent = s.document;
+    k("src").textContent = s.kind === "attack" ? "· real attack text from " + s.source : "";
+    k("doc2").textContent = L.input.action === "quarantined document" ? "[Quarantined: the assistant never sees this document]" : s.document;
+  } else { k("docWrap").remove(); k("docWrap2").remove(); }
+  toolList(k("uTools"), U.tool_calls); toolList(k("pTools"), P.tool_calls);
+  k("uReply").textContent = U.reply; k("pReply").textContent = P.reply;
+  k("uDmg").append(...chipsFor(U)); k("pDmg").append(...chipsFor(P));
+  for (const [b, r] of [["uBadge", U], ["pBadge", P]]) { k(b).textContent = r.outcome; k(b).classList.add(r.outcome); }
+
+  // Layer 1
+  const i = L.input, sc = i.document_score ?? i.user_score;
+  if (i.fired) k("L1").classList.add("fired");
+  k("L1p").textContent = `Score ${sc.toFixed(2)} vs threshold ${i.threshold.toFixed(2)} → ${i.action}.`;
+  k("L1m").querySelector("i").style.width = (sc * 100) + "%";
+  k("L1m").querySelector("b").style.left = (i.threshold * 100) + "%";
+  for (const e of i.evidence.slice(0, 5)) k("L1e").append(el("span", e, "mono"));
+  // Layer 2
+  const blocked = L.tools.decisions.filter(d => !d.allowed);
+  if (L.tools.fired) k("L2").classList.add("fired");
+  k("L2p").textContent = blocked.length
+    ? `Would block ${blocked.length} of ${L.tools.decisions.length} call(s) on its own: ` + blocked.map(d => d.tool + " — " + d.reason).join(" | ")
+    : L.tools.decisions.length ? `${L.tools.decisions.length} call(s) checked, none dangerous.` : "No tool calls to check.";
+  // Layer 3
+  if (L.output.fired) k("L3").classList.add("fired");
+  k("L3p").textContent = L.output.kinds.length
+    ? "Would catch on its own: " + L.output.kinds.join(", ") + ". Action: " + L.output.action + "."
+    : "Nothing sensitive in the reply.";
+
+  k("report").textContent = data.report.text;
+  k("gen").textContent = "· generated by " + data.report.generator + " · " + P.latency_ms.total + " ms total guard time";
+  const stage = $("#stage"); stage.textContent = ""; stage.append(node);
+}
+
+function updateScore() {
+  const vals = Object.values(results);
+  const atk = vals.filter(v => v.kind === "attack"), ben = vals.filter(v => v.kind === "benign");
+  const nA = scenarios.filter(s => s.kind === "attack").length, nB = scenarios.filter(s => s.kind === "benign").length;
+  $("#sUn").textContent = atk.length ? `${atk.filter(v => v.unprot === "breached").length} / ${atk.length}` : "–";
+  $("#sPr").textContent = atk.length ? `${atk.filter(v => v.prot === "breached").length} / ${atk.length}` : "–";
+  $("#sFa").textContent = ben.length ? `${ben.filter(v => v.falseAlarm).length} / ${ben.length}` : "–";
+}
+
+async function run(id) {
+  const s = scenarios.find(x => x.id === id);
+  document.querySelectorAll(".scn").forEach(b => b.classList.toggle("active", b.dataset.id === id));
+  const data = await api("/api/run/" + id, {method: "POST"});
+  render(s, data);
+  const P = data.protected;
+  results[id] = {kind: s.kind, unprot: data.unprotected.outcome, prot: P.outcome, falseAlarm: s.kind === "benign" && P.caught_by.length > 0};
+  const res = document.querySelector(`.scn[data-id="${id}"] .res`);
+  res.textContent = s.kind === "attack" ? (P.outcome === "breached" ? "✕ breached" : "✓ stopped") : (results[id].falseAlarm ? "! alarm" : "✓ ok");
+  res.style.color = (P.outcome === "breached" || results[id].falseAlarm) ? "var(--bad)" : "var(--good)";
+  updateScore();
+}
+
+$("#runAll").onclick = async () => {
+  const btn = $("#runAll"); btn.disabled = true;
+  for (const s of scenarios) { await run(s.id); await new Promise(r => setTimeout(r, 900)); }
+  btn.disabled = false;
+};
+
+$("#cRun").onclick = async () => {
+  const data = await api("/api/chat", {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({message: $("#cMsg").value, document: $("#cDoc").value})});
+  document.querySelectorAll(".scn").forEach(b => b.classList.remove("active"));
+  render({user: $("#cMsg").value, document: $("#cDoc").value, kind: "custom", source: ""}, data);
+};
+
+function renderMetrics(m) {
+  const box = $("#metrics"); box.textContent = "";
+  box.append(el("div", "Model evaluation · measured on " + m.platform.machine + " (" + m.platform.byteorder + "-endian)", "label"));
+  const t = el("table"); const head = el("tr");
+  for (const h of ["Model", "Test data", "Precision", "Recall", "F1", "False-alarm rate", "AUC"]) head.append(el("th", h));
+  t.append(head);
+  const rows = [
+    ["Injection · deployed", "untouched test split, other source", m.injection.deployed_on_untouched_test],
+    ["Injection · one source only", "same test split (baseline)", m.injection.baseline_source_a_only],
+    ["Tool-sequence behaviour", "separate synthetic seed", m.trace],
+  ];
+  for (const [name, data, s] of rows) {
+    const tr = el("tr");
+    for (const v of [name, data + " (n=" + s.n + ")", s.precision, s.recall, s.f1, (s.false_positive_rate * 100).toFixed(1) + "%", s.roc_auc]) tr.append(el("td", String(v)));
+    t.append(tr);
+  }
+  box.append(t);
+  box.append(el("div", `Injection model: ${m.injection.inference_ms_per_prompt} ms per prompt, trained in ${m.injection.fit_seconds}s on ${m.injection.rows.source_a + m.injection.rows.b_fit} rows. ` +
+    `${m.injection.rows.duplicates_removed} duplicate rows were removed so no test text appears in training. Datasets: ${m.datasets.source_a}; ${m.datasets.source_b}.`, "note"));
+}
+
+boot().catch(e => { $("#sys").textContent = ""; $("#sys").append(el("span", "API unreachable: " + e.message, "chip")); });
+</script>
+</body>
+</html>
