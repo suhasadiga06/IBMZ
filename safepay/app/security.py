@@ -108,9 +108,11 @@ def analyst(request: Request) -> str:
 
 
 # -- rate limits ----------------------------------------------------------------------
-# (path prefix, requests, per seconds). First match wins; the public demo is stricter.
-LIMITS = [("/demo/background", 1, 300), ("/demo/reset", 6, 60), ("/demo/script/", 20, 60), ("/demo/send", 30, 60),
-          ("/v1/cases/", 60, 60), ("/v1/packs/verify", 30, 60), ("/v1/screen", 6000, 60)]
+# (method or None for any, path prefix, requests, per seconds). First match wins; the public demo is stricter.
+# Only starting a background replay is expensive; the console polls its progress with GET.
+LIMITS = [("POST", "/demo/background", 1, 300), ("GET", "/demo/background", 120, 60), (None, "/demo/reset", 6, 60),
+          (None, "/demo/script/", 20, 60), (None, "/demo/send", 30, 60), (None, "/v1/cases/", 60, 60),
+          (None, "/v1/packs/verify", 30, 60), (None, "/v1/screen", 6000, 60)]
 PUBLIC_DEFAULT, PRIVATE_DEFAULT = (240, 60), (100_000, 60)
 
 
@@ -119,14 +121,15 @@ class RateLimiter:
         self.hits: dict[tuple[str, str], deque] = defaultdict(deque)
         self.lock = threading.Lock()
 
-    def allow(self, client: str, path: str, public: bool) -> tuple[bool, int]:
-        rule = next(((p, n, s) for p, n, s in LIMITS if path.startswith(p)), None)
+    def allow(self, client: str, path: str, public: bool, method: str = "GET") -> tuple[bool, int]:
+        rule = next(((m, p, n, s) for m, p, n, s in LIMITS if path.startswith(p) and m in (None, method)), None)
         if rule is None:
             n, s = PUBLIC_DEFAULT if public else PRIVATE_DEFAULT
             key = "*"
         else:
-            key, n, s = rule
-            if not public and not key.startswith("/demo/"):
+            m, p, n, s = rule
+            key = p if m is None else f"{m} {p}"
+            if not public and not p.startswith("/demo/"):
                 n *= 10
         now = time.monotonic()
         with self.lock:
@@ -187,7 +190,7 @@ async def middleware(request: Request, call_next) -> Response:
     except ValueError:
         return JSONResponse({"detail": "bad content-length"}, status_code=400, headers=SECURITY_HEADERS)
     # 4. Rate limits per client address.
-    ok, retry = limiter.allow(request.client.host if request.client else "?", path, settings.public)
+    ok, retry = limiter.allow(request.client.host if request.client else "?", path, settings.public, request.method)
     if not ok:
         return JSONResponse({"detail": "too many requests, slow down"}, status_code=429,
                             headers={"Retry-After": str(retry), **SECURITY_HEADERS})

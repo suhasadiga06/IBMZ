@@ -139,10 +139,23 @@ class Worker:
         self.handler = handler
         self.done = 0
         self.last_error = ""
+        self.pending: list[tuple] = []      # waiting or running, oldest first
+        self.lock = threading.Lock()
         threading.Thread(target=self._run, daemon=True).start()
 
-    def submit(self, job: tuple) -> None:
+    def submit(self, job: tuple) -> bool:
+        """Queue a job unless the same job is already waiting or running."""
+        with self.lock:
+            if job in self.pending:
+                return False
+            self.pending.append(job)
         self.q.put(job)
+        return True
+
+    def position(self, job: tuple) -> int | None:
+        """0 while running, 1 for next in line, … None if not queued."""
+        with self.lock:
+            return self.pending.index(job) if job in self.pending else None
 
     def _run(self) -> None:
         while True:
@@ -153,3 +166,6 @@ class Worker:
             except Exception as e:  # keep the worker alive; record what went wrong
                 self.last_error = f"{type(e).__name__}: {e}"[:300]
                 time.sleep(1)
+            finally:
+                with self.lock:
+                    self.pending.remove(job)

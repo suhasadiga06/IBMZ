@@ -220,6 +220,7 @@ def _case_view(c: dict) -> dict:
     c = dict(c)
     c["reasons"] = json.loads(c["reasons"] or "[]")
     c["second_opinion"] = json.loads(c["second_opinion"]) if c.get("second_opinion") else None
+    c["granite_position"] = worker.position((c["id"],))
     return c
 
 
@@ -267,10 +268,12 @@ def label(case_id: int, body: Label, x_analyst: str = Depends(analyst)) -> dict:
 def ask_granite(case_id: int) -> dict:
     if not store.case(case_id):
         raise HTTPException(404)
-    if worker.q.qsize() >= GRANITE_QUEUE_MAX:
-        raise HTTPException(429, "Granite is busy with other cases; try again in a few minutes.")
-    worker.submit((case_id,))
-    return {"queued": True, "queue_length": worker.q.qsize()}
+    if worker.position((case_id,)) is None:
+        if worker.q.qsize() >= GRANITE_QUEUE_MAX:
+            raise HTTPException(429, "Granite is busy with other cases; try again in a few minutes.")
+        worker.submit((case_id,))
+    # position 0 = being written now, n = n briefs ahead of it
+    return {"queued": True, "position": worker.position((case_id,)), "queue_length": worker.q.qsize()}
 
 
 @app.post("/v1/cases/{case_id}/evidence-pack")

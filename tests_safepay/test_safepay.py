@@ -325,6 +325,30 @@ def test_rate_limiter_counts_per_client_and_route():
     assert rl.allow("b", "/demo/reset", public=True)[0]          # another client is unaffected
 
 
+def test_background_replay_is_limited_but_its_progress_is_not():
+    from safepay.app.security import RateLimiter
+    rl = RateLimiter()
+    assert rl.allow("a", "/demo/background", public=False, method="POST")[0]
+    assert not rl.allow("a", "/demo/background", public=False, method="POST")[0]   # one replay per 5 minutes
+    assert all(rl.allow("a", "/demo/background", public=False, method="GET")[0] for _ in range(60))
+
+
+def test_granite_worker_never_queues_the_same_case_twice():
+    import threading
+    from safepay.core.granite import Worker
+    gate, ran = threading.Event(), []
+    w = Worker(lambda case_id: (gate.wait(5), ran.append(case_id)))
+    assert w.submit((1,)) and w.submit((2,))
+    assert not w.submit((1,))                                      # asking again doesn't add a copy
+    assert w.position((1,)) == 0 and w.position((2,)) == 1 and w.position((3,)) is None
+    gate.set()
+    for _ in range(50):
+        if w.position((2,)) is None:
+            break
+        threading.Event().wait(0.05)
+    assert ran == [1, 2] and w.position((1,)) is None
+
+
 @pytest.fixture(autouse=True)
 def _fresh_rate_limits():
     import sys
