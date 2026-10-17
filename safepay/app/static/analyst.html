@@ -33,7 +33,14 @@
   .evtable { max-height: 300px; overflow: auto; }
   .empty { color: var(--muted); padding: 40px; text-align: center; }
   .reasons { margin: 4px 0 0; padding-left: 18px; font-size: 14px; }
-  @media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
+  .safe { border: 1px solid var(--line); border-left: 4px solid var(--warn); border-radius: 8px; padding: 12px 14px;
+          display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; }
+  .safe .full { grid-column: 1 / -1; }
+  .safe .v { font-size: 14px; margin-top: 2px; }
+  .safe .ok { color: var(--good); } .safe .bad { color: var(--bad); }
+  .packs { font-size: 13px; margin-top: 6px; }
+  .packs a { color: var(--accent); }
+  @media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } .safe { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -120,6 +127,50 @@ function chart(ev, hiddenAt, harmLimit) {
   return svg;
 }
 
+const CHANNELS = {in_app: "In the app only", phone: "Phone call", email: "Email", none: "Do not contact"};
+
+function safetyPanel(id, s) {
+  const p = el("div", null, "safe");
+  const item = (label, value, cls = "", full = false) => {
+    const d = el("div", null, full ? "full" : ""); d.append(el("div", label, "label"), el("div", value, "v " + cls)); p.append(d); return d;
+  };
+  const pr = s.preferences;
+  item("Safe contact (set by the customer)", pr
+    ? `${CHANNELS[pr.contact_channel]}, ${pr.safe_hours_from}–${pr.safe_hours_to}` + (pr.shared_device ? " · shared device: neutral wording only" : "")
+    : "Not set. Use the in-app inbox only, with neutral wording.", pr ? "" : "muted");
+  const log = s.evidence_log;
+  item("Evidence log", log.intact ? `Intact · ${log.entries} entries · head ${log.head.slice(0, 12)}…`
+                                  : `Integrity check FAILED at entry ${log.first_bad_entry}`, log.intact ? "ok" : "bad");
+  if (pr && pr.note) item("Customer's note", pr.note, "", true);
+  const cons = el("div", null, "full");
+  cons.append(el("div", "Evidence pack", "label"), el("div", s.consent
+    ? `The customer allowed a record of this sender's payments on ${fmt(s.consent.granted)}, for: ${s.consent.purpose}.`
+    : "No consent. A record can only be prepared after the customer asks for one in their app.", "v " + (s.consent ? "ok" : "muted")));
+  const btn = el("button", "Prepare signed evidence pack", "btn small"); btn.disabled = !s.consent || !log.intact;
+  btn.style.marginTop = "8px";
+  btn.onclick = async () => {
+    btn.disabled = true;
+    const r = await fetch(`/v1/cases/${id}/evidence-pack`, {method: "POST", headers: {"X-Analyst": "analyst-demo"}});
+    const j = await r.json();
+    if (!r.ok) { btn.textContent = j.detail; return; }
+    // (This page's open() shadows window.open, so open the new tab with a link.)
+    const a = document.createElement("a"); a.href = j.url; a.target = "_blank"; a.rel = "noopener"; a.click();
+    open(id);
+  };
+  cons.append(btn);
+  if (s.packs.length) {
+    const list = el("div", null, "packs");
+    for (const pk of s.packs) {
+      const a = el("a", `Pack #${pk.id}`); a.href = `/pack/${pk.id}`; a.target = "_blank";
+      const row = el("div"); row.append(a, el("span", ` · ${fmt(pk.created)} · ${pk.analyst} · SHA-256 ${pk.sha256.slice(0, 16)}…`, "mono muted"));
+      list.append(row);
+    }
+    cons.append(list);
+  }
+  p.append(cons);
+  return p;
+}
+
 async function open(id) {
   current = id; clearInterval(poll);
   const d = await api("/v1/cases/" + id, {headers: {"X-Analyst": "analyst-demo"}});
@@ -130,6 +181,7 @@ async function open(id) {
   box.append(head);
   head.lastChild.style.fontSize = "12px";
   const ul = el("ul", null, "reasons"); for (const r of c.reasons.slice(0, 5)) ul.append(el("li", r)); box.append(ul);
+  box.append(safetyPanel(id, d.safety));
 
   const facts = el("div", null, "facts");
   for (const [k, v] of Object.entries(d.facts)) { if (k === "model_reasons") continue; const f = el("div", null, "fact"); f.append(el("div", String(v), "v"), el("div", k.replace(/_/g, " "), "k")); facts.append(f); }

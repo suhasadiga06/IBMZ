@@ -23,7 +23,7 @@ from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from safepay.core import granite, iso20022, relmodel
+from safepay.core import evidence_pack, granite, iso20022, relmodel
 from safepay.core.privacy import Privacy
 from safepay.core.screener import Screener
 from safepay.core.state import FEATURES
@@ -46,6 +46,7 @@ TREE_FORMAT = relmodel.optimise(rel_bundle["model"], np.zeros((256, len(FEATURES
 rel_bundle["version"] = f"text+rel/{rel_bundle['kind']}/{time.strftime('%Y%m%d', time.gmtime((ART / 'rel.joblib').stat().st_mtime))}"
 store = Store(DB)
 privacy = Privacy()
+SIGN_KEY = evidence_pack.signing_key()
 app = FastAPI(title="SafePay", version="1.0")
 
 STATS = {"screened": 0, "hidden": 0, "cases_opened": 0, "nudges": 0}
@@ -152,6 +153,60 @@ def hide(body: Hide) -> dict:
     return {"ok": True}
 
 
+# -- recipient safety: preferences and consent ---------------------------------------
+class SafetyPrefs(BaseModel):
+    contact_channel: str = Field("in_app", pattern="^(in_app|phone|email|none)$")
+    safe_hours_from: str = Field("09:00", pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    safe_hours_to: str = Field("17:00", pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    shared_device: bool = False          # "someone else may see my phone"
+    note: str = Field("", max_length=200)
+
+
+def save_prefs(recipient_token: str, p: SafetyPrefs) -> None:
+    # Encrypted: a note like "my partner checks my phone" is itself sensitive.
+    store.set_prefs(recipient_token, {"sealed": privacy.seal(p.model_dump_json(), f"prefs:{recipient_token}")})
+    store.audit("recipient", "set_safety_preferences", None, recipient_token)
+
+
+def load_prefs(recipient_token: str) -> dict | None:
+    row = store.prefs(recipient_token)
+    if not row:
+        return None
+    return {**json.loads(privacy.open(row["sealed"], f"prefs:{recipient_token}")), "updated": row["updated"]}
+
+
+class PrefsIn(SafetyPrefs):
+    recipient_account: str
+
+
+@app.post("/v1/recipients/preferences")
+def set_preferences(body: PrefsIn) -> dict:
+    save_prefs(privacy.token(body.recipient_account), SafetyPrefs(**body.model_dump(exclude={"recipient_account"})))
+    return {"ok": True}
+
+
+class ConsentIn(BaseModel):
+    recipient_account: str
+    sender_account: str
+    purpose: str = Field("police", pattern="^(police|protection_order|legal_advice)$")
+    grant: bool = True
+
+
+def set_consent(recipient_token: str, sender_token: str, purpose: str, grant: bool) -> dict:
+    if grant:
+        cid = store.grant_consent(recipient_token, sender_token, purpose)
+        store.audit("recipient", f"consent_granted:{purpose}", None, f"{recipient_token} for {sender_token}")
+        return {"ok": True, "consent_id": cid}
+    store.withdraw_consent(recipient_token, sender_token)
+    store.audit("recipient", "consent_withdrawn", None, f"{recipient_token} for {sender_token}")
+    return {"ok": True}
+
+
+@app.post("/v1/recipients/consent")
+def consent(body: ConsentIn) -> dict:
+    return set_consent(privacy.token(body.recipient_account), privacy.token(body.sender_account), body.purpose, body.grant)
+
+
 # -- analyst API -------------------------------------------------------------------
 def _case_view(c: dict) -> dict:
     c = dict(c)
@@ -176,7 +231,11 @@ def case(case_id: int, x_analyst: str = Header("analyst-demo")) -> dict:
           for e in store.evidence(case_id)]
     st = screener.engine.states.get((c["sender"], c["recipient"]))
     facts, _ = case_facts(case_id)
-    return {"case": _case_view(c), "evidence": ev, "facts": facts,
+    cons = store.consent(c["recipient"], c["sender"])
+    safety = {"preferences": load_prefs(c["recipient"]),
+              "consent": {"purpose": evidence_pack.PURPOSES[cons["purpose"]], "granted": cons["granted"]} if cons else None,
+              "packs": store.packs(case_id), "evidence_log": store.verify_chain(case_id)}
+    return {"case": _case_view(c), "evidence": ev, "facts": facts, "safety": safety,
             "hidden_at": st.hidden_at if st else 0, "first_ts": st.first_ts if st else None}
 
 
@@ -201,6 +260,58 @@ def ask_granite(case_id: int) -> dict:
         raise HTTPException(404)
     worker.submit((case_id,))
     return {"queued": True, "queue_length": worker.q.qsize()}
+
+
+@app.post("/v1/cases/{case_id}/evidence-pack")
+def make_pack(case_id: int, x_analyst: str = Header("analyst-demo")) -> dict:
+    c = store.case(case_id)
+    if not c:
+        raise HTTPException(404)
+    cons = store.consent(c["recipient"], c["sender"])
+    if not cons:
+        raise HTTPException(403, "The recipient has not consented to a record of this sender's payments.")
+    chain = store.verify_chain(case_id)
+    if not chain["intact"]:
+        store.audit(x_analyst, "pack_refused_integrity", case_id, f"bad entry {chain['first_bad_entry']}")
+        raise HTTPException(409, f"Evidence log fails its integrity check at entry {chain['first_bad_entry']}.")
+    ev = [{**e, "reference": privacy.open(e["sealed_ref"], f"case:{case_id}")} for e in store.evidence(case_id)]
+    facts, _ = case_facts(case_id)
+    body = evidence_pack.build(c, ev, facts, cons, chain, x_analyst, screener.model_version,
+                               c.get("summary"), c.get("summary_by"))
+    signed = evidence_pack.sign(body, SIGN_KEY)
+    pid = store.add_pack(case_id, x_analyst, signed["sha256"],
+                         privacy.seal(json.dumps(signed), f"pack:{signed['sha256']}"), cons["id"])
+    store.audit(x_analyst, "evidence_pack_created", case_id, signed["sha256"])
+    return {"pack_id": pid, "sha256": signed["sha256"], "url": f"/pack/{pid}"}
+
+
+@app.get("/v1/packs/{pack_id}")
+def get_pack(pack_id: int, x_analyst: str = Header("analyst-demo")) -> dict:
+    p = store.pack(pack_id)
+    if not p:
+        raise HTTPException(404)
+    store.audit(x_analyst, "evidence_pack_viewed", p["case_id"], p["sha256"])
+    return json.loads(privacy.open(p["sealed_body"], f"pack:{p['sha256']}"))
+
+
+@app.get("/v1/evidence/public-key")
+def public_key() -> dict:
+    return {"algorithm": "Ed25519", "public_key": evidence_pack.public_key_hex(SIGN_KEY)}
+
+
+@app.post("/v1/packs/verify")
+async def verify_pack(request: Request) -> dict:
+    """Anyone holding a pack (police, a court) can check it. Nothing is stored."""
+    try:
+        signed = await request.json()
+    except Exception:
+        raise HTTPException(400, "body must be the pack's JSON")
+    out = evidence_pack.verify(signed, evidence_pack.public_key_hex(SIGN_KEY))
+    known = store.pack_by_hash(signed.get("sha256", "")) if isinstance(signed, dict) else None
+    out["issued_by_this_service"] = known is not None
+    if known:
+        out["evidence_log_still_intact"] = store.verify_chain(known["case_id"])["intact"]
+    return out
 
 
 @app.get("/v1/audit")
@@ -327,6 +438,48 @@ def demo_hide(recipient: str, sender: str) -> dict:
     return {"ok": True}
 
 
+def _person(key: str) -> tuple[str, str]:
+    if key not in PEOPLE:
+        raise HTTPException(404, "unknown person")
+    return PEOPLE[key]
+
+
+@app.get("/demo/safety/{person}")
+def demo_safety(person: str) -> dict:
+    """What the recipient's 'Message settings' screen shows."""
+    _, acct = _person(person)
+    r_tok = privacy.token(acct)
+    hidden: dict[str, int] = {}
+    for item in INBOX[person]:
+        if item["hidden"]:
+            hidden[item["from_key"]] = hidden.get(item["from_key"], 0) + 1
+    senders = []
+    for key, n in hidden.items():
+        s_tok = privacy.token(PEOPLE[key][1])
+        cons = store.consent(r_tok, s_tok)
+        senders.append({"key": key, "name": PEOPLE[key][0], "hidden_messages": n,
+                        "consent": cons["purpose"] if cons else None})
+    return {"preferences": load_prefs(r_tok) or SafetyPrefs().model_dump(), "senders": senders,
+            "purposes": evidence_pack.PURPOSES}
+
+
+@app.post("/demo/safety/{person}/preferences")
+def demo_prefs(person: str, body: SafetyPrefs) -> dict:
+    save_prefs(privacy.token(_person(person)[1]), body)
+    return {"ok": True}
+
+
+class DemoConsent(BaseModel):
+    sender: str
+    purpose: str = Field("police", pattern="^(police|protection_order|legal_advice)$")
+    grant: bool = True
+
+
+@app.post("/demo/safety/{person}/consent")
+def demo_consent(person: str, body: DemoConsent) -> dict:
+    return set_consent(privacy.token(_person(person)[1]), privacy.token(_person(body.sender)[1]), body.purpose, body.grant)
+
+
 # Each scenario has its own sender, so cases stay separate in the review queue.
 SCRIPTS = {
     # The case reported by the press: one threat spread over nine transfers.
@@ -416,6 +569,11 @@ def analyst_page() -> FileResponse:
 @app.get("/system")
 def system_page() -> FileResponse:
     return FileResponse(STATIC / "system.html")
+
+
+@app.get("/pack/{pack_id}")
+def pack_page(pack_id: int) -> FileResponse:
+    return FileResponse(STATIC / "pack.html")
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")

@@ -5,6 +5,7 @@ Run: python3 -m pytest -q tests_safepay
 """
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -145,13 +146,82 @@ def test_sender_never_nudged_once_under_review():
     assert first.nudge_sender and not watched.nudge_sender
 
 
+# -- evidence log and evidence packs ------------------------------------------------
+from safepay.core import evidence_pack  # noqa: E402
+from safepay.core.store import Store  # noqa: E402
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey  # noqa: E402
+
+
+def _store_with_evidence(n=3) -> Store:
+    s = Store(":memory:")
+    for i in range(n):
+        s.add_evidence(7, 1_780_000_000 + i * 60, 0.01, f"sealed-{i}", 0.1 * i, 0.0, True)
+    return s
+
+
+def test_evidence_chain_detects_edits_and_deletions():
+    s = _store_with_evidence()
+    assert s.verify_chain(7)["intact"] and s.verify_chain(7)["entries"] == 3
+    s.x("UPDATE evidence SET sealed_ref='changed' WHERE id=2")
+    assert s.verify_chain(7) == {"intact": False, "entries": 3, "first_bad_entry": 2, "head": None}
+    s2 = _store_with_evidence()
+    s2.x("DELETE FROM evidence WHERE id=2")
+    assert s2.verify_chain(7)["first_bad_entry"] == 3
+
+
+def test_consent_grant_and_withdraw():
+    s = Store(":memory:")
+    assert s.consent("r", "s") is None
+    s.grant_consent("r", "s", "police")
+    assert s.consent("r", "s")["purpose"] == "police"
+    s.withdraw_consent("r", "s")
+    assert s.consent("r", "s") is None
+
+
+def _signed_pack(key):
+    s = _store_with_evidence()
+    case = {"id": 7, "sender": "acct_s", "recipient": "acct_r", "opened": 1_780_000_000, "priority": "P1",
+            "status": "open", "score": 0.97, "reasons": '["message reads as a threat (0.99)"]'}
+    ev = [{**e, "reference": f"message {i}"} for i, e in enumerate(s.evidence(7))]
+    consent = {"id": 1, "purpose": "protection_order", "granted": 1_780_000_500}
+    body = evidence_pack.build(case, ev, {"payments_from_sender": 3, "model_risk_score": 0.97}, consent,
+                               s.verify_chain(7), "analyst-1", "test")
+    return evidence_pack.sign(body, key)
+
+
+def test_pack_is_signed_and_any_change_is_detected():
+    key = Ed25519PrivateKey.generate()
+    pub = evidence_pack.public_key_hex(key)
+    signed = _signed_pack(key)
+    assert evidence_pack.verify(signed, pub)["valid"]
+    assert "model_risk_score" not in signed["pack"]["pattern"]           # model output kept separate from facts
+    assert signed["pack"]["purpose"] == "Application for a protection order"
+    signed["pack"]["timeline"][1]["message"] = "edited"
+    v = evidence_pack.verify(signed, pub)
+    assert not v["valid"] and not v["fingerprint_matches"] and not v["signature_valid"]
+
+
+def test_pack_signed_by_another_key_is_rejected():
+    signed = _signed_pack(Ed25519PrivateKey.generate())
+    v = evidence_pack.verify(signed, evidence_pack.public_key_hex(Ed25519PrivateKey.generate()))
+    assert not v["valid"] and not v["signed_by_this_bank"]
+    assert not evidence_pack.verify({"garbage": True}, "00" * 32)["valid"]
+
+
 # -- end to end (trained models, on the VM) -----------------------------------------
-@needs_models
-def test_api_scenarios_end_to_end():
-    os.environ["SAFEPAY_DB"] = str(Path(tempfile.mkdtemp()) / "t.db")
+@pytest.fixture(scope="module")
+def api():
+    tmp = Path(tempfile.mkdtemp())
+    os.environ.update(SAFEPAY_DB=str(tmp / "t.db"), SAFEPAY_KEY_FILE=str(tmp / "key"),
+                      SAFEPAY_SIGN_KEY_FILE=str(tmp / "sign_key"), SAFEPAY_LLM_URL="http://127.0.0.1:9")
     from fastapi.testclient import TestClient
     from safepay.app.main import app
-    c = TestClient(app)
+    return TestClient(app)
+
+
+@needs_models
+def test_api_scenarios_end_to_end(api):
+    c = api
     c.post("/demo/reset")
     split = c.post("/demo/script/split_threat").json()["last"]
     assert split["decision"]["message"] == "HIDE" and split["decision"]["priority"] == "P1"
@@ -163,3 +233,40 @@ def test_api_scenarios_end_to_end():
     r = c.post("/v1/screen", content=xml, headers={"Content-Type": "application/xml"}).json()["results"][0]
     assert r["decision"]["message"] == "SHOW" and "<Ustrd>rent</Ustrd>" in r["forwarded_pacs008"]
     assert c.get("/healthz").json()["ok"]
+
+
+@needs_models
+def test_safety_journey_consent_gates_a_verifiable_pack(api):
+    c = api
+    c.post("/demo/reset")
+    case_id = c.post("/demo/script/coercive").json()["last"]["case_id"]
+    assert case_id
+    # No consent: no pack.
+    assert c.post(f"/v1/cases/{case_id}/evidence-pack").status_code == 403
+    # Recipient sets safe-contact preferences and consents for this one sender.
+    note = "partner checks my phone"
+    assert c.post("/demo/safety/sam/preferences", json={"contact_channel": "in_app", "safe_hours_from": "10:00",
+                                                        "safe_hours_to": "14:00", "shared_device": True,
+                                                        "note": note}).json()["ok"]
+    safety = c.get("/demo/safety/sam").json()
+    assert [x["key"] for x in safety["senders"]] == ["riley"] and safety["senders"][0]["consent"] is None
+    c.post("/demo/safety/sam/consent", json={"sender": "riley", "purpose": "police"})
+    detail = c.get(f"/v1/cases/{case_id}").json()["safety"]
+    assert detail["preferences"]["shared_device"] and detail["consent"]["purpose"] == "Report to police"
+    assert detail["evidence_log"]["intact"]
+    # Preferences are encrypted at rest.
+    from safepay.app.main import store
+    assert note not in json.dumps(store.q("SELECT * FROM prefs"))
+    assert "gym" not in json.dumps(store.q("SELECT * FROM pairs"))   # relationship state too
+    # Pack: created, retrievable, verifiable; never contains the safe-contact note.
+    made = c.post(f"/v1/cases/{case_id}/evidence-pack").json()
+    pack = c.get(f"/v1/packs/{made['pack_id']}").json()
+    assert pack["sha256"] == made["sha256"] and note not in json.dumps(pack)
+    assert len(pack["pack"]["timeline"]) == 8                         # all 8, including those before the case opened
+    v = c.post("/v1/packs/verify", json=pack).json()
+    assert v["valid"] and v["issued_by_this_service"] and v["evidence_log_still_intact"]
+    pack["pack"]["timeline"][0]["message"] = "edited"
+    assert not c.post("/v1/packs/verify", json=pack).json()["valid"]
+    # Withdrawn consent stops new packs.
+    c.post("/demo/safety/sam/consent", json={"sender": "riley", "grant": False})
+    assert c.post(f"/v1/cases/{case_id}/evidence-pack").status_code == 403

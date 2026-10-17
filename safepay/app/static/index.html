@@ -47,6 +47,32 @@
             border-radius: 6px; padding: 10px; white-space: pre-wrap; word-break: break-all; }
   details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
   .ev span { display: inline-block; background: var(--chip); border-radius: 4px; padding: 0 6px; margin: 2px 4px 0 0; font-size: 12.5px; }
+  [hidden] { display: none !important; }          /* panes set display:flex, which would beat the attribute */
+  .tabs { display: flex; gap: 4px; margin: 0 0 10px; background: var(--chip); border-radius: 8px; padding: 3px; }
+  .tabs button { flex: 1; border: 0; background: none; color: var(--muted); font: inherit; font-size: 13.5px; font-weight: 600;
+                 padding: 6px; border-radius: 6px; cursor: pointer; }
+  .tabs button.on { background: var(--panel); color: var(--ink); box-shadow: var(--shadow); }
+  .safety { display: flex; flex-direction: column; gap: 12px; max-height: 560px; overflow: auto; font-size: 14px; }
+  .safety h3 { margin: 0; font-size: 15px; }
+  .safety .lede { margin: 0; color: var(--muted); font-size: 13px; }
+  .safety section { border: 1px solid var(--line); border-radius: 10px; padding: 10px 11px; background: var(--bg); }
+  .safety section > .label { display: block; margin-bottom: 6px; }
+  .safety select, .safety input[type=time], .safety textarea { font: inherit; font-size: 13.5px; padding: 6px 8px; border-radius: 6px;
+                 border: 1px solid var(--line); background: var(--panel); color: var(--ink); width: 100%; }
+  .safety textarea { resize: vertical; min-height: 44px; }
+  .safety .row { display: flex; gap: 8px; align-items: center; margin-bottom: 7px; }
+  .safety .row > * { flex: 1; }
+  .safety .check { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; margin: 4px 0 8px; }
+  .safety .check input { margin-top: 3px; }
+  .safety .sender { border-top: 1px solid var(--line); padding-top: 8px; margin-top: 8px; }
+  .safety .sender:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+  .safety .status { font-size: 12.5px; color: var(--muted); margin-top: 5px; }
+  .safety .status.on { color: var(--good); }
+  .safety .help a { display: block; color: var(--accent); text-decoration: none; margin: 3px 0; }
+  .btn.small { padding: 6px 10px; font-size: 13px; }
+  .exit { position: sticky; top: 0; align-self: flex-end; z-index: 1; }
+  .neutral .bal { font-size: 26px; font-weight: 700; margin: 4px 0 10px; }
+  .neutral .tx .amt { color: var(--ink); }
   @media (max-width: 1150px) { .stage { grid-template-columns: 1fr; } .steps { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 600px) { .steps, .outcome { grid-template-columns: 1fr; } }
 </style>
@@ -91,10 +117,23 @@
         screening service on IBM Z as an ISO&nbsp;20022 pacs.008 message.</div>
     </div>
 
-    <div class="phone">
+    <div class="phone" id="recipPhone">
       <div class="bar"><div><div class="who" id="recipName">Sam Patel</div><div class="bank">Recipient's banking app</div></div>
         <span class="chip" id="hideState"></span></div>
-      <div class="inbox" id="inbox"><div class="empty">No payments yet.</div></div>
+      <div class="tabs" role="tablist">
+        <button class="on" data-view="payments" role="tab">Payments</button>
+        <button data-view="settings" role="tab">Message settings</button>
+      </div>
+      <div class="inbox" id="inbox" data-pane="payments"><div class="empty">No payments yet.</div></div>
+      <div class="safety" id="safety" data-pane="settings" hidden></div>
+      <div class="neutral" id="neutral" data-pane="neutral" hidden>
+        <div class="label">Everyday account</div><div class="bal">$2,481.20</div>
+        <div class="inbox">
+          <div class="tx"><div class="top"><span>Corner Café</span><span class="amt">−$5.40</span></div></div>
+          <div class="tx"><div class="top"><span>FreshMart</span><span class="amt">−$64.15</span></div></div>
+          <div class="tx"><div class="top"><span>City Transit</span><span class="amt">−$12.00</span></div></div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -189,7 +228,7 @@ async function inbox() {
     if (it.hidden) {
       const acts = el("div", null, "acts");
       const view = el("a", "View anyway"); view.onclick = () => { d.querySelector(".ref").textContent = it.reference || "(no message)"; d.classList.remove("hidden"); };
-      const help = el("a", "Get support"); help.onclick = () => alert("Your bank's specialist team can help, confidentially. In an emergency call 000.");
+      const help = el("a", "Get support"); help.onclick = async () => { await showView("settings"); $("#support")?.scrollIntoView({block: "nearest"}); };
       acts.append(view, help); d.append(acts);
     } else if (it.reference) {
       const acts = el("div", null, "acts");
@@ -200,6 +239,86 @@ async function inbox() {
     box.append(d);
   }
 }
+
+// -- Recipient: message settings (safety and support) --------------------------------
+const CHANNELS = {in_app: "In the app only", phone: "Phone call", email: "Email", none: "Please don't contact me"};
+let view = "payments";
+
+async function showView(v) {
+  view = v;
+  document.querySelectorAll("#recipPhone [data-pane]").forEach(p => p.hidden = p.dataset.pane !== v);
+  document.querySelectorAll("#recipPhone .tabs button").forEach(b => b.classList.toggle("on", b.dataset.view === v));
+  if (v === "settings") await safety();
+  else $("#safety").textContent = "";        // nothing sensitive stays on screen or in the page
+}
+
+function quickExit() {
+  // Instantly replace the screen with an ordinary-looking account view.
+  $("#safety").textContent = "";
+  showView("neutral");
+}
+
+function option(sel, value, label, current) { const o = el("option", label); o.value = value; o.selected = value === current; sel.append(o); }
+
+async function safety() {
+  const who = $("#recipient").value;
+  const s = await api("/demo/safety/" + who), p = s.preferences;
+  const box = $("#safety"); box.textContent = "";
+  const exit = el("button", "Quick exit ✕", "btn danger small exit"); exit.title = "Leave this screen now (Esc)"; exit.onclick = quickExit;
+  box.append(exit, el("h3", "Safety and support"),
+    el("p", "Only you and your bank's specialist team can see these choices. People who pay you are never told.", "lede"));
+
+  // How to contact me safely
+  const c = el("section"); c.append(el("span", "How we contact you", "label"));
+  const ch = el("select"); for (const [k, v] of Object.entries(CHANNELS)) option(ch, k, v, p.contact_channel);
+  const from = el("input"); from.type = "time"; from.value = p.safe_hours_from;
+  const to = el("input"); to.type = "time"; to.value = p.safe_hours_to;
+  const hours = el("div", null, "row"); hours.append(el("span", "Safe times", "muted"), from, to);
+  const shared = el("label", null, "check"); const cb = el("input"); cb.type = "checkbox"; cb.checked = p.shared_device;
+  shared.append(cb, el("span", "Someone else may see my phone. Use neutral wording and never mention this."));
+  const note = el("textarea"); note.maxLength = 200; note.value = p.note || ""; note.placeholder = "Anything we should know (optional)";
+  const saved = el("div", "", "status");
+  const save = el("button", "Save", "btn small"); save.onclick = async () => {
+    await post(`/demo/safety/${who}/preferences`, {contact_channel: ch.value, safe_hours_from: from.value, safe_hours_to: to.value,
+                                                   shared_device: cb.checked, note: note.value});
+    saved.textContent = "Saved. The specialist team will follow this."; saved.classList.add("on");
+  };
+  const chRow = el("div", null, "row"); chRow.append(ch);
+  note.style.marginBottom = "8px";
+  c.append(chRow, hours, shared, note, save, saved);
+  box.append(c);
+
+  // Hidden messages, and consent to a record of them
+  const h = el("section"); h.append(el("span", "Messages we've hidden", "label"));
+  if (!s.senders.length) h.append(el("div", "None so far.", "muted"));
+  for (const snd of s.senders) {
+    const row = el("div", null, "sender");
+    row.append(el("div", `${snd.name} · ${snd.hidden_messages} hidden message${snd.hidden_messages === 1 ? "" : "s"}`));
+    const status = el("div", "", "status" + (snd.consent ? " on" : ""));
+    status.textContent = snd.consent
+      ? `Your bank can prepare a signed record of these payments for: ${s.purposes[snd.consent]}. You can withdraw this at any time.`
+      : "If you want to report this, your bank can prepare a signed record of these payments for you.";
+    const pur = el("select"); for (const [k, v] of Object.entries(s.purposes)) option(pur, k, v, snd.consent || "police");
+    const btn = el("button", snd.consent ? "Withdraw" : "Allow a record", "btn small" + (snd.consent ? " ghost" : ""));
+    btn.onclick = async () => { await post(`/demo/safety/${who}/consent`, {sender: snd.key, purpose: pur.value, grant: !snd.consent}); safety(); };
+    const r2 = el("div", null, "row"); r2.append(pur, btn);
+    row.append(r2, status); h.append(row);
+  }
+  box.append(h);
+
+  // Support
+  const sup = el("section", null, "help"); sup.id = "support"; sup.append(el("span", "Support, any time", "label"));
+  const line = (txt, href) => { const a = el("a", txt); a.href = href; return a; };
+  sup.append(line("1800RESPECT · 1800 737 732 · 24/7 family violence support", "tel:1800737732"),
+             line("Emergency · 000", "tel:000"));
+  const team = el("a", "Message our specialist team (in the app, confidential)"); team.href = "#";
+  team.onclick = e => { e.preventDefault(); team.textContent = "A specialist will reply in the app, at your safe times."; };
+  sup.append(team);
+  box.append(sup);
+}
+
+document.querySelectorAll("#recipPhone .tabs button").forEach(b => b.onclick = () => showView(b.dataset.view));
+document.addEventListener("keydown", e => { if (e.key === "Escape" && view === "settings") quickExit(); });
 
 $("#send").onclick = async () => {
   const btn = $("#send"); btn.disabled = true;
@@ -212,7 +331,7 @@ $("#send").onclick = async () => {
   } finally { btn.disabled = false; }
 };
 $("#sender").onchange = () => { $("#senderName").textContent = NAMES[$("#sender").value]; };
-$("#recipient").onchange = inbox;
+$("#recipient").onchange = () => { inbox(); if (view === "settings") safety(); };
 document.querySelectorAll("[data-script]").forEach(b => b.onclick = async () => {
   b.disabled = true;
   try {
@@ -221,7 +340,7 @@ document.querySelectorAll("[data-script]").forEach(b => b.onclick = async () => 
     $("#recipient").value = to; render(out.last); await inbox();
   } finally { b.disabled = false; }
 });
-$("#reset").onclick = async () => { await post("/demo/reset"); $("#trace").textContent = ""; $("#trace").append(el("div", "Demo data cleared.", "empty")); $("#hideState").textContent = ""; inbox(); };
+$("#reset").onclick = async () => { await post("/demo/reset"); $("#trace").textContent = ""; $("#trace").append(el("div", "Demo data cleared.", "empty")); $("#hideState").textContent = ""; inbox(); showView("payments"); };
 sys(); inbox();
 </script>
 </body>

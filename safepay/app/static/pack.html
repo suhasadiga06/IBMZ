@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Payment Evidence Record</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/common.css">
+<style>
+  .doc { max-width: 920px; margin: 0 auto; padding: 22px 24px 40px; }
+  .doc h1 { font-size: 24px; margin: 0 0 2px; letter-spacing: -.01em; }
+  .doc h2 { font-size: 16px; margin: 24px 0 8px; }
+  .meta { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px 18px; margin-top: 14px; }
+  .meta .v { font-size: 14px; }
+  .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 14px 0 4px; }
+  .result { border-radius: 8px; padding: 10px 12px; margin-top: 10px; font-size: 14px; }
+  .result.ok { background: var(--good-bg); color: var(--good); }
+  .result.bad { background: var(--bad-bg); color: var(--bad); }
+  .draft { border: 1px dashed var(--line); border-radius: 8px; padding: 10px 12px; }
+  .fp { word-break: break-all; font-size: 12.5px; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  ul.disc { color: var(--muted); font-size: 12.5px; padding-left: 18px; }
+  @media print {
+    :root { --bg: #fff; --panel: #fff; --ink: #000; --muted: #333; --line: #bbb; --chip: #eee; }
+    .noprint { display: none !important; }
+    body { background: #fff; }
+    .doc { padding: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="doc">
+  <div class="noprint bar">
+    <button class="btn" id="print">Print / save as PDF</button>
+    <button class="btn ghost" id="download">Download signed file</button>
+    <button class="btn ghost" id="verify">Verify</button>
+    <button class="btn ghost" id="tamper" title="Change one character in a copy and verify it">Simulate tampering</button>
+    <a href="/analyst" class="muted" style="margin-left:auto">Back to console</a>
+  </div>
+  <div id="vres" class="noprint"></div>
+  <div id="root"><div class="muted">Loading…</div></div>
+</div>
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+function el(tag, text, cls) { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; }
+const id = location.pathname.split("/").pop();
+let signed = null;
+
+function table(head, rows, numeric = []) {
+  const t = el("table"), hr = el("tr");
+  head.forEach((h, i) => hr.append(el("th", h, numeric.includes(i) ? "num" : "")));
+  t.append(hr);
+  for (const r of rows) { const tr = el("tr"); r.forEach((c, i) => tr.append(el("td", c == null ? "—" : String(c), numeric.includes(i) ? "num" : ""))); t.append(tr); }
+  return t;
+}
+function meta(pairs) {
+  const m = el("div", null, "meta");
+  for (const [k, v] of pairs) { const d = el("div"); d.append(el("div", k, "label"), el("div", v ?? "—", "v")); m.append(d); }
+  return m;
+}
+const when = s => s ? new Date(s).toLocaleString(undefined, {dateStyle: "medium", timeStyle: "short"}) + " (" + s.replace("+00:00", "Z") + ")" : "—";
+
+function render(s) {
+  const P = s.pack, root = $("#root"); root.textContent = "";
+  root.append(el("div", "Payment evidence record", "label"), el("h1", P.purpose),
+    meta([["Generated", when(P.generated_utc)], ["Prepared by", `${P.generated_by.analyst} · ${P.generated_by.system} ${P.generated_by.model_version}`],
+          ["Case reference", "#" + P.case.case_ref], ["Case opened", when(P.case.opened_utc)],
+          ["Sender reference", P.parties.sender_ref], ["Recipient reference", P.parties.recipient_ref],
+          ["Consent", `Given by ${P.consent.given_by}, ${when(P.consent.given_utc)}`], ["Scope", P.consent.scope]]));
+
+  root.append(el("h2", `Timeline of payments (${P.timeline.length})`));
+  root.append(table(["#", "Time", "Amount", "Message", "Shown to recipient", "Harm", "Threat"],
+    P.timeline.map(t => [t.n, when(t.time_utc), t.amount == null ? "not recorded" : "$" + t.amount.toFixed(2), t.message,
+                         t.shown_to_recipient ? "yes" : "no, withheld", t.harm_score.toFixed(2), t.threat_score.toFixed(2)]), [0, 2, 5, 6]));
+
+  root.append(el("h2", "Pattern"));
+  root.append(table(["", ""], Object.entries(P.pattern).map(([k, v]) => [k.replace(/_/g, " "), typeof v === "boolean" ? (v ? "yes" : "no") : v])));
+
+  root.append(el("h2", "Model assessment (not a finding of fact)"));
+  const ul = el("ul"); for (const r of P.model_assessment.reasons) ul.append(el("li", r));
+  root.append(el("div", `Relationship risk score ${P.model_assessment.risk_score.toFixed(2)}.`), ul);
+
+  if (P.ai_draft_summary) {
+    root.append(el("h2", "AI-drafted summary · " + P.ai_draft_summary.status));
+    const d = el("div", null, "draft"); d.append(el("div", P.ai_draft_summary.text), el("div", P.ai_draft_summary.generated_by || "", "muted"));
+    root.append(d);
+  }
+
+  root.append(el("h2", "Integrity"));
+  root.append(meta([["Evidence log", `${P.integrity.evidence_log_entries} entries · ${P.integrity.evidence_log_intact ? "intact" : "NOT intact"}`],
+                    ["Signature", s.signature.algorithm]]));
+  root.append(el("div", "Fingerprint of this record (SHA-256)", "label"), el("div", s.sha256, "mono fp"),
+              el("div", "Evidence log head (SHA-256)", "label"), el("div", P.integrity.evidence_log_head_sha256, "mono fp"),
+              el("div", "Bank's public signing key (Ed25519)", "label"), el("div", s.signature.public_key, "mono fp"));
+  const disc = el("ul", null, "disc"); for (const d of P.disclaimers) disc.append(el("li", d));
+  root.append(el("h2", "Notes"), disc);
+}
+
+async function verify(obj, label) {
+  const r = await fetch("/v1/packs/verify", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(obj)});
+  const v = await r.json(), box = $("#vres");
+  box.textContent = "";
+  const ok = v.valid && v.issued_by_this_service;
+  const msg = ok
+    ? `${label}: VALID. Fingerprint matches, Ed25519 signature is the bank's, issued by this service, and the evidence log is still intact.`
+    : `${label}: NOT VALID. Fingerprint ${v.fingerprint_matches ? "matches" : "does not match"}, signature ${v.signature_valid ? "valid" : "invalid"}.`;
+  box.append(el("div", msg, "result " + (ok ? "ok" : "bad")));
+}
+
+$("#print").onclick = () => window.print();
+$("#download").onclick = () => {
+  const a = el("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(signed, null, 2)], {type: "application/json"}));
+  a.download = `safepay-evidence-pack-${id}.json`; a.click(); URL.revokeObjectURL(a.href);
+};
+$("#verify").onclick = () => verify(signed, "This record");
+$("#tamper").onclick = () => {
+  const copy = JSON.parse(JSON.stringify(signed));
+  copy.pack.timeline[0].message += ".";                       // one extra full stop
+  verify(copy, `Copy with one character added to message 1 (“${copy.pack.timeline[0].message}”)`);
+};
+
+fetch("/v1/packs/" + id, {headers: {"X-Analyst": "analyst-demo"}}).then(r => r.ok ? r.json() : Promise.reject(r.status))
+  .then(s => { signed = s; render(s); })
+  .catch(e => { $("#root").textContent = "Could not load this pack (" + e + ")."; });
+</script>
+</body>
+</html>

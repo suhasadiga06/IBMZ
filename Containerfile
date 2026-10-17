@@ -21,6 +21,7 @@ COPY data/cc_test.csv ./data/
 
 ENV SAFEPAY_DB=/var/lib/safepay/safepay.db \
     SAFEPAY_KEY_FILE=/var/lib/safepay/key \
+    SAFEPAY_SIGN_KEY_FILE=/var/lib/safepay/sign_key \
     SAFEPAY_LLM_URL=http://127.0.0.1:8081 \
     PYTHONUNBUFFERED=1
 VOLUME /var/lib/safepay
