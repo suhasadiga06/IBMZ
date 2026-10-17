@@ -63,6 +63,34 @@ By type, SafePay caught 100% of harassment, split-threat and coercive-control re
 
 > **Read this honestly.** Zero false alarms is a property of a synthetic world we built, and real data will be harder. The comparison that should hold up is *timing*: scoring every payment as it arrives protects victims days or weeks sooner than a monthly batch, and withholds most abusive messages before they're ever seen.
 
+### Outside check: Commonwealth Bank's production model on our simulator
+
+A model trained on our own simulator can always look good on it. So we scored the same test world with **CBA's open-source production model** ([h2oai/aitd](https://github.com/h2oai/aitd)). It was trained on *real*, expert-labelled abuse and has never seen our data. How we ran it is in [`safepay/scripts/cba/`](safepay/scripts/cba/README.md), and the numbers are in [`results/cba_validation.json`](results/cba_validation.json).
+
+| Model (6,774 relationships, 400 abusive) | ROC AUC | PR AUC | Precision in top 50 | Precision in top 400 |
+|---|---|---|---|---|
+| CBA's model, monthly (best month per relationship) | 0.977 | 0.860 | 100% | 76.0% |
+| SafePay | **0.998** | **0.993** | 100% | **98.3%** |
+| *For reference: CBA's model on real data, as published* | *0.79–0.80* | | *70% (35/50)* | |
+
+Month by month, CBA's model scored ROC AUC 0.87–0.93 (0.94 for its 3-month model) on our world.
+
+What this tells us:
+
+1. **Our synthetic abuse looks like abuse to a model trained on real abuse.** Without any tuning to our data, CBA's model puts 99% of our harassment and 95% of our split-threat relationships in its top 400. That's an outside sign the simulator's core patterns are realistic.
+2. **Our world is easier than reality.** CBA's model does *better* here (AUC ≈ 0.92 per month) than on real data (0.80). That's consistent with our zero false alarms, and it's why we don't claim real-world precision.
+3. **The gaps are where we expected.** Share of each abusive type in each model's top 400:
+
+| Abusive type | n | CBA's model | SafePay |
+|---|---|---|---|
+| Harassment | 131 | 99% | 100% |
+| Split threats | 79 | 95% | 100% |
+| Coercive control (polite, menacing) | 93 | 69% | 100% |
+| Abusive child-support payers (legitimate amounts) | 43 | 47% | 95% |
+| Low and slow (few payments) | 54 | 28% | 91% |
+
+A text-led monthly model misses abuse that hides behind polite words, legitimate amounts or low volume. Those are the cases SafePay's behaviour features target. **Caveat:** SafePay was trained on this simulator and CBA's model wasn't, so part of SafePay's lead is home advantage. What carries weight is CBA's model independently recognising the abusive patterns, and which types it struggles with.
+
 ### How we got here (development history, kept on purpose)
 
 | Version | Test world | Precision | False alarms /10K innocent | What we found |
@@ -109,6 +137,7 @@ Threats are rare and hard to pin down from text alone. That's exactly why the re
 
 - **We measured instead of assuming.** The VM exposes the Telum II AI accelerator (`nnpa` in `/proc/cpuinfo`), and Snap ML's automatic choice picks it. For our small forest on this shared 3-core VM, the CPU engine was 5× faster, so the service uses whichever engine the benchmark measured as fastest (`artifacts/benchmark.json`). The accelerator path is one setting away for larger models.
 - **Big-endian, natively.** The stack runs on Ubuntu's native s390x builds of numpy, SciPy and scikit-learn, because PyPI has no s390x wheels for them. Granite's GGUF file was converted to big-endian with llama.cpp's converter.
+- **H2O's model scorer isn't big-endian safe.** Scoring CBA's H2O MOJO models on s390x fails: a tree split on feature 33 (`0x0021`) is read as 8448 (`0x2100`), with `ArrayIndexOutOfBoundsException: Index 8448 out of bounds for length 53`. The same jar and model score fine on x86, so that one step ran on x86. It's a real portability issue for banks moving H2O models onto IBM Z.
 - **Toolchain notes we hit.** Ubuntu 24.04's GCC 13 can't target the z17 (`-march=arch15` needs GCC 15), so llama.cpp is built for z16, which the z17 runs natively. llama.cpp's own zDNN backend only accelerates FP16/FP32 models, and Granite in FP16 (~5 GB) doesn't fit beside everything else in 8 GB RAM, so Granite runs on the vector units.
 - **Data never leaves the platform.** Models, Granite, the case store and the audit log all run on the same LinuxONE system. Account numbers are replaced by keyed HMAC tokens on arrival, and evidence is encrypted with AES-256-GCM, bound to its case. There's no external AI API.
 - **Containerised.** The `Containerfile` builds an s390x image with Podman.
@@ -199,4 +228,6 @@ agentguard/                 our earlier prototype (AI-assistant firewall), kept 
 | [cryptography](https://github.com/pyca/cryptography) | Apache-2.0 / BSD |
 | [Apache Arrow (pyarrow)](https://github.com/apache/arrow), used once to convert Parquet | Apache-2.0 |
 | [Podman](https://github.com/containers/podman) | Apache-2.0 |
+| [CBA / H2O.ai AITD model and pipeline](https://github.com/h2oai/aitd), used only for the outside check | Apache-2.0 |
+| [Detoxify](https://github.com/unitaryai/detoxify) checkpoint `toxic_bias-4e693588`, [distilbert-base-uncased-emotion](https://huggingface.co/bhadresh-savani/distilbert-base-uncased-emotion), [VADER](https://github.com/cjhutto/vaderSentiment), [wordninja](https://github.com/keredson/wordninja), [PyTorch](https://github.com/pytorch/pytorch), [Transformers](https://github.com/huggingface/transformers), used only for the outside check | Apache-2.0 / MIT / BSD |
 | [IBM Plex](https://github.com/IBM/plex) fonts | OFL-1.1 |

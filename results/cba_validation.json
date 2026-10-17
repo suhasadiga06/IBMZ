@@ -1,0 +1,108 @@
+{
+  "source": "github.com/h2oai/aitd (Apache-2.0), models CBA_AITD_Short / CBA_AITD_Long",
+  "runs": {
+    "202605_lag0": {
+      "relationships": 3516,
+      "abusive": 146,
+      "roc_auc": 0.8722,
+      "pr_auc": 0.5425,
+      "precision_at_50": 0.82,
+      "precision_at_100": 0.6,
+      "precision_at_146": 0.5068,
+      "model": "CBA_AITD_Short",
+      "missing_features": []
+    },
+    "202606_lag0": {
+      "relationships": 4134,
+      "abusive": 279,
+      "roc_auc": 0.9091,
+      "pr_auc": 0.7062,
+      "precision_at_50": 1.0,
+      "precision_at_100": 0.99,
+      "precision_at_279": 0.6237,
+      "model": "CBA_AITD_Short",
+      "missing_features": []
+    },
+    "202607_lag0": {
+      "relationships": 4141,
+      "abusive": 272,
+      "roc_auc": 0.9303,
+      "pr_auc": 0.7848,
+      "precision_at_50": 1.0,
+      "precision_at_100": 1.0,
+      "precision_at_272": 0.7022,
+      "model": "CBA_AITD_Short",
+      "missing_features": []
+    },
+    "202608_lag0": {
+      "relationships": 3413,
+      "abusive": 116,
+      "roc_auc": 0.9235,
+      "pr_auc": 0.6496,
+      "precision_at_50": 0.92,
+      "precision_at_100": 0.63,
+      "precision_at_116": 0.569,
+      "model": "CBA_AITD_Short",
+      "missing_features": []
+    },
+    "202608_lag2": {
+      "relationships": 3413,
+      "abusive": 116,
+      "roc_auc": 0.9377,
+      "pr_auc": 0.6986,
+      "precision_at_50": 0.96,
+      "precision_at_100": 0.65,
+      "precision_at_116": 0.5948,
+      "model": "CBA_AITD_Long",
+      "missing_features": []
+    }
+  },
+  "notes": [
+    "CBA reported ROC AUC 0.79 (Short) / 0.80 (Long) on real one-month out-of-sample data, and 35 of its top 50 real relationships confirmed abusive."
+  ],
+  "cba_short_any_month": {
+    "relationships": 6774,
+    "abusive": 400,
+    "roc_auc": 0.9769,
+    "pr_auc": 0.8604,
+    "precision_at_50": 1.0,
+    "precision_at_100": 1.0,
+    "precision_at_400": 0.76
+  },
+  "safepay_same_relationships": {
+    "relationships": 6774,
+    "abusive": 400,
+    "roc_auc": 0.9982,
+    "pr_auc": 0.9934,
+    "precision_at_50": 1.0,
+    "precision_at_100": 1.0,
+    "precision_at_400": 0.9825
+  },
+  "abusive_kinds_in_top_k": {
+    "abusive_child_support": {
+      "n": 43,
+      "cba": 0.465,
+      "safepay": 0.953
+    },
+    "coercive_control": {
+      "n": 93,
+      "cba": 0.688,
+      "safepay": 1.0
+    },
+    "harassment": {
+      "n": 131,
+      "cba": 0.992,
+      "safepay": 1.0
+    },
+    "low_and_slow": {
+      "n": 54,
+      "cba": 0.278,
+      "safepay": 0.907
+    },
+    "split_threat": {
+      "n": 79,
+      "cba": 0.949,
+      "safepay": 1.0
+    }
+  }
+}

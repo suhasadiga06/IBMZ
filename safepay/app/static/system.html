@@ -93,6 +93,23 @@ async function main() {
       `and ${pct(msg.innocent_hidden_share)} of ${msg.innocent_messages.toLocaleString()} innocent ones. Money was delivered in every case. False-alarm bars are drawn at 5× scale.`, two));
   }
 
+  const V = m.cba_validation;
+  if (V) {
+    const C = V.cba_short_any_month, S = V.safepay_same_relationships;
+    const rows = [["ROC AUC", num(C.roc_auc, 3), num(S.roc_auc, 3)], ["PR AUC", num(C.pr_auc, 3), num(S.pr_auc, 3)],
+                  ["Precision in top 50", pct(C.precision_at_50), pct(S.precision_at_50)],
+                  ["Precision in top 100", pct(C.precision_at_100), pct(S.precision_at_100)],
+                  [`Precision in top ${C.abusive} (= number of abusive)`, pct(C[`precision_at_${C.abusive}`]), pct(S[`precision_at_${S.abusive}`])]];
+    const kinds = Object.entries(V.abusive_kinds_in_top_k).map(([k, v]) => [k.replace(/_/g, " "), v.n, pct(v.cba), pct(v.safepay)]);
+    const two = el("div", null, "two"); const a = el("div"), b = el("div");
+    a.append(el("div", `Ranking ${C.relationships.toLocaleString()} relationships (${C.abusive} abusive)`, "label"), table(["", "CBA production model", "SafePay"], rows, [1, 2]));
+    b.append(el("div", "Abusive kinds each model ranks in its top " + C.abusive, "label"), table(["Kind", "n", "CBA", "SafePay"], kinds, [1, 2, 3]));
+    two.append(a, b);
+    root.append(section("Checked against Commonwealth Bank's production model",
+      "CBA's open-source model was trained on real, expert-labelled abuse. Scoring our synthetic test world with it is an outside check on " +
+      "the simulator: it has never seen our data. CBA reported ROC AUC 0.79–0.80 and 35 of its top 50 confirmed abusive on real data.", two));
+  }
+
   if (T) {
     const H = T.harm.test_payment_length, TH = T.threat.test_payment_length, rb = T.robustness;
     const rows = [["Harm (abusive, harassing)", H.n.toLocaleString(), H.positives.toLocaleString(), num(H.precision), num(H.recall), num(H.f1), num(H.roc_auc, 3)],
