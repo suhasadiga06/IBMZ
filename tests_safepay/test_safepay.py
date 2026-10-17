@@ -196,10 +196,10 @@ def test_consent_grant_and_withdraw():
     assert s.consent("r", "s") is None
 
 
-def _signed_pack(key):
+def _signed_pack(key, score=0.97):
     s = _store_with_evidence()
     case = {"id": 7, "sender": "acct_s", "recipient": "acct_r", "opened": 1_780_000_000, "priority": "P1",
-            "status": "open", "score": 0.97, "reasons": '["message reads as a threat (0.99)"]'}
+            "status": "open", "score": score, "reasons": '["message reads as a threat (0.99)"]'}
     ev = [{**e, "reference": f"message {i}"} for i, e in enumerate(s.evidence(7))]
     consent = {"id": 1, "purpose": "protection_order", "granted": 1_780_000_500}
     body = evidence_pack.build(case, ev, {"payments_from_sender": 3, "model_risk_score": 0.97}, consent,
@@ -217,6 +217,15 @@ def test_pack_is_signed_and_any_change_is_detected():
     signed["pack"]["timeline"][1]["message"] = "edited"
     v = evidence_pack.verify(signed, pub)
     assert not v["valid"] and not v["fingerprint_matches"] and not v["signature_valid"]
+
+
+def test_pack_still_verifies_after_a_browser_round_trip():
+    # A browser parses 1.0 as 1 and sends it back that way; the pack page verifies what the browser holds.
+    key = Ed25519PrivateKey.generate()
+    signed = _signed_pack(key, score=1.0)
+    as_js = json.loads(json.dumps(signed), parse_float=lambda t: int(float(t)) if float(t).is_integer() else float(t))
+    assert as_js["pack"]["model_assessment"]["risk_score"] == 1 and isinstance(as_js["pack"]["model_assessment"]["risk_score"], int)
+    assert evidence_pack.verify(as_js, evidence_pack.public_key_hex(key))["valid"]
 
 
 def test_pack_signed_by_another_key_is_rejected():

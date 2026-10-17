@@ -43,8 +43,19 @@ def utc(ts: float | None) -> str | None:
     return datetime.fromtimestamp(ts, timezone.utc).isoformat(timespec="seconds") if ts else None
 
 
+def _plain(obj):
+    # JSON has one number type: a browser reads 1.0 back as 1, so whole floats are written as integers.
+    if isinstance(obj, float) and obj.is_integer():
+        return int(obj)
+    if isinstance(obj, dict):
+        return {k: _plain(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_plain(v) for v in obj]
+    return obj
+
+
 def canonical(obj) -> bytes:
-    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return json.dumps(_plain(obj), sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
 # -- signing key -------------------------------------------------------------------
