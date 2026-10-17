@@ -2,7 +2,7 @@
 
 **IBM Z Datathon 2026 · Event code: SSF2026 · Theme 1: Real-Time AI for Critical Decisions** (with Theme 2: sensitive data stays on-platform)
 
-> Submission title format: `[Team Name_IBM Z Datathon 2026 Project]`
+> Individual entry by Suhas Adiga. Submission title: `Suhas Adiga_IBM Z Datathon 2026 Project`
 
 ## The problem
 
@@ -67,22 +67,55 @@ With that consent, an analyst can prepare a **signed evidence pack**:
 
 ## Results
 
-### Real-time vs monthly batch (synthetic test world, seed 5, never used for any decision)
+### Real-time vs monthly batch (synthetic test world, seed 10, never used for any decision)
 
-4,400 relationships, 44,209 payments, 400 abusive. Message text is real (Civil Comments **test** split). The hand-written phrases are a third the models never saw. The baseline re-implements Commonwealth Bank's published method (monthly relationship aggregates, random forest) using **our** message model, so the difference comes from real-time relationship scoring.
+4,481 relationships (6,871 counting each direction), 44,426 payments, 481 abusive. People have several relationships, so victims also get payments from friends, family and landlords, and innocent people sometimes hide senders too. Message text is real (Civil Comments **test** split). The hand-written phrases are a third the models never saw. The baseline re-implements Commonwealth Bank's published method (monthly relationship aggregates, random forest) using **our** message model, so the difference comes from real-time relationship scoring.
 
 | | **SafePay (real-time)** | CBA-style (monthly batch) |
 |---|---|---|
-| Abusive relationships caught | **390 / 400 (97.5%)** | 386 / 400 (96.5%) |
-| False alarms in 6,374 innocent relationships | 0 | 0 |
-| **Median time from first abusive payment to case** | **3.2 days** | **19.9 days** |
-| Caught within 24 hours | **24.5%** | 1.0% |
-| Abusive messages withheld *as they arrived* | **93.6%** | 0% (it only acts after the month) |
-| Innocent messages withheld (soft hide; recipient can view) | 2.6% | 0% |
+| Abusive relationships caught | **452 / 481 (94.0%)** | 465 / 481 (96.7%) |
+| False alarms in 6,390 innocent relationships | **0** | 2 |
+| **Median time from first abusive payment to case** | **3.3 days** | **19.3 days** |
+| Caught within 24 hours | **18.1%** | 1.3% |
+| Abusive messages withheld *as they arrived* | **92.0%** | 0% (it only acts after the month) |
+| Innocent messages withheld (soft hide; recipient can view) | 2.8% | 0% |
 
-By type, SafePay caught 100% of harassment, split-threat and coercive-control relationships, 93% of abusive child-support payers and 87% of "low and slow" abusers (the monthly baseline caught 78% of those).
+By type, SafePay caught 100% of harassment, split-threat and coercive-control relationships, 93% of abusive child-support payers, 84% of switched accounts (below) and 80% of "low and slow" abusers. **Its weak spot is abusive child-support payers:** their payments come fortnightly or monthly, so the evidence takes weeks to build (median 58 days to a case), and the monthly baseline catches all of them. SafePay still withholds 64% of their abusive messages as they arrive, because the message model doesn't wait for the pattern.
 
-> **Read this honestly.** Zero false alarms is a property of a synthetic world we built, and real data will be harder. The comparison that should hold up is *timing*: scoring every payment as it arrives protects victims days or weeks sooner than a monthly batch, and withholds most abusive messages before they're ever seen.
+> **Read this honestly.** Zero false alarms in 6,390 is a property of a synthetic world we built, and real data will be harder; the next section tests this at a realistic scale. The comparison that should hold up is *timing*: scoring every payment as it arrives protects victims weeks sooner than a monthly batch, and withholds most abusive messages before they're ever seen.
+
+### Stress-testing our own simulator
+
+We made the simulated world harder in three ways, and each one taught us something.
+
+**1. A more realistic population exposed a shortcut.** In earlier versions every relationship had two brand-new people, and only victims ever hid anyone. Now each party is someone already in the world half the time, and innocent people hide senders too (someone tired of loan reminders, friends who fell out). The previous model, scored on these worlds, raised **9–12 false alarms per ~4,800 innocent relationships**. 8 of the 9 we inspected were friends who had hidden each other, with harmless messages like "groceries split": the model had learned *"a hide means abuse"*. Retrained on the new worlds: 0 on the test world.
+
+**2. Account switching.** Hidden by the victim, the abuser carries on from a new account or a friend's, up to three times. Each new account is a stranger with no history.
+
+| Switched accounts (test world, 81 new-account relationships) | Result |
+|---|---|
+| Caught | 84% (median 40 hours after the new account's first payment) |
+| Their messages withheld, model only | 72%. The first two payments get through, because a case needs 3 payments on behaviour alone |
+| Withheld with **protect-after-hide** (below) | **99%** |
+| Innocent relationships touched by protect-after-hide | 17 of 6,390 (0.3%), soft hide only, no investigation |
+
+We first tried teaching the *model* about the recipient's side (whether the victim recently hid someone, how soon a new sender appeared, how many new senders since). It made **no measurable difference**: 84% caught at 40 hours with these signals, 85% at 41 hours without. Rules fixed in advance picked between the two versions on validation; they tied, and the tie-break (fewer validation false alarms, 0 vs 2) kept the version with the signals. So the fix is **policy, not the model**. For 14 days after a customer hides someone, messages from brand-new senders they have never paid back are hidden by default, with one tap to view. That extends the victim's own choice to the abuser's next account.
+
+**3. A realistic share of abusers.** In the test world 7% of relationships are abusive; in real banking it's a tiny fraction, so even rare false alarms could swamp real cases. We replayed a separate world of **305,163 innocent relationships (1.7 million payments)** through the final model and policy:
+
+| 305,163 innocent relationships, 1,703,849 payments | Result |
+|---|---|
+| False alarms (cases opened) | **15**: 0.49 per 10,000 (95% interval 0.28–0.81) |
+| Where they came from | 12 friends, 2 debt reminders, 1 couple |
+| Innocent messages soft-hidden | 3.0% (protect-after-hide adds 0.05 points; it touched 462 relationships, 0.15%) |
+
+| If this share of relationships were abusive | Cases that are real abuse | Worst case (95% interval) |
+|---|---|---|
+| 1 in 100 | 99.5% | 99.2% |
+| 1 in 1,000 | 95.0% | 92.1% |
+| 1 in 10,000 | **65.7%** | 53.7% |
+
+(Using the test world's 94.0% catch rate.) So at a realistic 1 in 10,000, about one case in three would be a false alarm, roughly one extra review for every two real cases. That's in line with what Commonwealth Bank reports on real data (35 of its top 50 confirmed, 70%). It's workable because a false alarm costs a human review and some soft-hidden messages, never a blocked payment or a contacted customer. The zero false alarms in the 6,390-relationship test world were luck of scale: 15 in 305,163 is the number to plan with.
 
 ### Outside check: Commonwealth Bank's production model on our simulator
 
@@ -110,7 +143,7 @@ What this tells us:
 | Abusive child-support payers (legitimate amounts) | 43 | 47% | 95% |
 | Low and slow (few payments) | 54 | 28% | 91% |
 
-A text-led monthly model misses abuse that hides behind polite words, legitimate amounts or low volume. Those are the cases SafePay's behaviour features target. **Caveat:** SafePay was trained on this simulator and CBA's model wasn't, so part of SafePay's lead is home advantage. What carries weight is CBA's model independently recognising the abusive patterns, and which types it struggles with.
+A text-led monthly model misses abuse that hides behind polite words, legitimate amounts or low volume. Those are the cases SafePay's behaviour features target. **Caveats:** SafePay was trained on this simulator and CBA's model wasn't, so part of SafePay's lead is home advantage. And this check used the v4 simulator and model; the CBA pipeline was run once, on that world. What carries weight is CBA's model independently recognising the abusive patterns, and which types it struggles with.
 
 ### How we got here (development history, kept on purpose)
 
@@ -119,15 +152,17 @@ A text-led monthly model misses abuse that hides behind polite words, legitimate
 | v1 | seed 3 | 70% | 251 | The model memorised the exact scores of a few hand-written innocent phrases. Validation reused training phrases, so it looked perfect (F1 0.99) and hid this |
 | v2 | seed 4 | 80% | 156 | Fixed with a three-way phrase split, a score floor and phrase variation. Then friends' banter tripped it, because the test phrases were ruder than the training ones |
 | v3 | seed 5 | 100% | 0 | Broader banter in every split of the phrase lists. Median time to case 1.7 days |
-| **final** | seed 5 | **100%** | **0** | Two realism rules prompted by the *live demo*, not by test scores: no behaviour-only case before 3 payments (one 1 a.m. penny payment scored 0.71), and references under 4 letters judged only as part of joined text ("I" scored 0.96 as a threat). They made test timing *worse* (median 1.7 → 3.2 days) and we kept them |
+| v4 | seed 5 | 100% | 0 | Two realism rules prompted by the *live demo*, not by test scores: no behaviour-only case before 3 payments (one 1 a.m. penny payment scored 0.71), and references under 4 letters judged only as part of joined text ("I" scored 0.96 as a threat). They made test timing *worse* (median 1.7 → 3.2 days) and we kept them |
+| v4 on harder worlds | seeds 2, 9 | – | 19–25 | People with several relationships and innocent hides: the model had learned "a hide means abuse" (see the stress test above) |
+| **final** | seed 10 | **100%** | **0** | Retrained on the realistic population, with account switching and recipient-side signals, plus the protect-after-hide policy. Catches slightly fewer than the monthly baseline (94.0% vs 96.7%) |
 
-Seeds 3 and 4 were used for diagnosis. Seed 5 was evaluated twice, for v3 and for the final version, and the change between them was not chosen to improve its numbers. Every version's metrics are in `results/`.
+Seeds 3, 4 and 9 were used for diagnosis. Seed 5 was evaluated twice, for v3 and v4, and the change between them was not chosen to improve its numbers. The final model was chosen on validation and scored once on seed 10. Every version's metrics are in `results/`.
 
 ### Does IBM Granite's second opinion help?
 
 Granite reads a relationship's facts and messages and answers one question: is this harassment, stalking or coercive control? It does **not** see the risk model's score, so the opinion is independent. We generate a single token (Yes/No) and use the probability Granite gives "Yes" as its score. That's both faster and measurable.
 
-**Setup.** Each evaluation uses a world no model was trained on. It includes every relationship Granite could change, plus 30 controls:
+**Setup** (run with the v4 model and simulator). Each evaluation uses a world no model was trained on. It includes every relationship Granite could change, plus 30 controls:
 - **Near misses:** not flagged, scoring within 0.2 below the case threshold, with at least 3 payments.
 - **Weak cases:** flagged, but with no abusive words.
 
@@ -182,11 +217,11 @@ Threats are rare and hard to pin down from text alone. That's exactly why the re
 
 | | Result |
 |---|---|
-| Full screening path in one process (message → joined → state → relationship → policy → encrypt state → SQLite write) | **922 payments/s**, median 0.27 ms, p99 5.8 ms (an earlier run, before state encryption: 699/s, p99 7.4 ms; runs vary a lot on this shared VM) |
-| Same, over HTTP with real ISO 20022 XML | **615 requests/s**, median 0.72 ms, p99 5.9 ms |
-| Relationship model, Snap ML compressed trees on CPU | **12 µs** per payment |
-| Relationship model, Snap ML on the **on-chip AI accelerator** (zDNN) | 61–98 µs per payment |
-| IBM Granite 3.3 2B, Q4_K_M, on the CPU's vector units, 3 threads | 11.8 prompt tokens/s, 1.34 generated tokens/s. With the lab notebook container also running on the 8 GB VM: 3.8 and 0.41 (220 s per brief), as Linux evicts the memory-mapped model |
+| Full screening path in one process (message → joined → state → relationship → policy → encrypt state → SQLite write) | **933 payments/s**, median 0.27 ms, p99 5.9 ms (earlier runs with the previous model: 922/s, and 699/s before state encryption; runs vary on this shared VM) |
+| Same, over HTTP with real ISO 20022 XML | **577 requests/s**, median 0.77 ms, p99 6.7 ms |
+| Relationship model, Snap ML compressed trees on CPU | **11 µs** per payment |
+| Relationship model, Snap ML on the **on-chip AI accelerator** (zDNN) | 61–97 µs per payment |
+| IBM Granite 3.3 2B, Q4_K_M, on the CPU's vector units, 3 threads | 11.8 prompt tokens/s, 1.34 generated tokens/s. With the lab notebook container also running on the 8 GB VM: about 4–7 and 0.4 (about 220 s per brief), as Linux evicts the memory-mapped model |
 
 - **We measured instead of assuming.** The VM exposes the Telum II AI accelerator (`nnpa` in `/proc/cpuinfo`), and Snap ML's automatic choice picks it. For our small forest on this shared 3-core VM, the CPU engine was 5× faster, so the service uses whichever engine the benchmark measured as fastest (`artifacts/benchmark.json`). The accelerator path is one setting away for larger models.
 - **Big-endian, natively.** The stack runs on Ubuntu's native s390x builds of numpy, SciPy and scikit-learn, because PyPI has no s390x wheels for them. Granite's GGUF file was converted to big-endian with llama.cpp's converter.
@@ -222,7 +257,7 @@ From your laptop:
 ssh -N -L 8090:127.0.0.1:8090 linux1@<vm-ip>
 ```
 
-Then open http://localhost:8090 (live demo; the recipient's **Message settings** tab is the victim's side), `/analyst` (specialist console, where a case with consent offers **Prepare signed evidence pack**), `/pack/{id}` (the printable pack, with Verify and Simulate tampering), and `/system` (every number above, read from the training and benchmark outputs).
+Then open http://localhost:8090 (live demo, with five scenarios including **Hidden, then switches account**; the recipient's **Message settings** tab is the victim's side), `/analyst` (specialist console, where a case with consent offers **Prepare signed evidence pack**), `/pack/{id}` (the printable pack, with Verify and Simulate tampering), and `/system` (every number above, read from the training and benchmark outputs).
 
 Container: `podman build -t safepay -f Containerfile . && bash run_safepay.sh container`
 
@@ -269,6 +304,8 @@ safepay/app/                FastAPI service + demo, analyst and evidence pages
 - **Synthetic relationships.** The next step is a pilot on a bank's own (consented, pseudonymised) payment logs, with the analyst labels SafePay already collects feeding retraining.
 - **English only.** CBA's paper lists other languages as an open gap, and Granite's multilingual support is the natural route.
 - **Granite's second opinion rests on small samples.** About 50 cases per world and only 10 abusive near misses in total, so it stays advisory (see above).
+- **A switched account's first messages rely on a policy, not the model.** Protect-after-hide catches them only if the victim used "hide". An abuser who switches accounts *before* being hidden is a stranger again for his first three payments.
+- **Child-support abuse is caught slowly** (median 58 days), because the payments are fortnightly or monthly.
 - **A pack's history before the case is the last 20 messages.** A bank would attach the relationship's full payment history from its own records.
 - **A signature proves a record wasn't changed, not that it's true.** The pack also depends on the bank resolving pseudonymous references to people. Whether a court accepts it is a legal question for the bank and the victim's lawyer. The support numbers shown are Australian, to match the demo.
 

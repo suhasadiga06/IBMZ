@@ -152,11 +152,19 @@ def vary(text: str, rng: random.Random) -> str:
     return text[:140]
 
 
+# Chance that each party of a new relationship is someone already in the world.
+# People have several relationships, so a victim also gets payments from friends,
+# family and landlords, and recipient-level signals can't key on "has two senders".
+REUSE = 0.5
+
+
 class Builder:
     def __init__(self, split: str, seed: int):
         self.rng = random.Random(seed)
         self.text = TextPools(split, self.rng)
         self.customers: dict[str, str] = {}
+        self.people: list[str] = []
+        self.pairs: set[frozenset] = set()
         self.rels: list[Relationship] = []
         self.txs: list[Tx] = []
         self.hides: list[tuple[datetime, str, str]] = []
@@ -165,7 +173,15 @@ class Builder:
     def person(self) -> str:
         acct = f"{self.rng.randint(10, 99)}{self.rng.randint(1000, 9999)}-{self.rng.randint(10**7, 10**8 - 1)}"
         self.customers[acct] = f"{self.rng.choice(FIRST)} {self.rng.choice(LAST)}"
+        self.people.append(acct)
         return acct
+
+    def party(self, avoid: str | None = None) -> str:
+        if self.people and self.rng.random() < REUSE:
+            p = self.rng.choice(self.people)
+            if p != avoid:
+                return p
+        return self.person()
 
     def when(self, day: float, night_bias: float = 0.1) -> datetime:
         r = self.rng
@@ -176,10 +192,23 @@ class Builder:
         s, t = (rel.recipient, rel.sender) if reverse else (rel.sender, rel.recipient)
         self.txs.append(Tx(ts, s, t, round(max(amount, 0.01), 2), ref[:140], rel.rel_id))
 
-    def rel(self, kind: str, label: int) -> Relationship:
-        r = Relationship(len(self.rels), self.person(), self.person(), kind, label)
+    def rel(self, kind: str, label: int, sender: str | None = None, recipient: str | None = None) -> Relationship:
+        """A new relationship between two people who have never paid each other."""
+        for _ in range(20):
+            s = sender or self.party(avoid=recipient)
+            t = recipient or self.party(avoid=s)
+            if s != t and frozenset((s, t)) not in self.pairs:
+                break
+        else:
+            s, t = sender or self.person(), recipient or self.person()
+        self.pairs.add(frozenset((s, t)))
+        r = Relationship(len(self.rels), s, t, kind, label)
         self.rels.append(r)
         return r
+
+    def last_ts(self, r: Relationship) -> datetime | None:
+        ts = [x.ts for x in self.txs if x.rel_id == r.rel_id]
+        return max(ts) if ts else None
 
     def micro(self) -> float:
         return self.rng.choice([0.01, 0.01, 0.01, 0.05, 0.10, 0.5, 1.0])
@@ -192,8 +221,10 @@ class Builder:
             d = min(d0 + self.rng.expovariate(1 / 8), DAYS - 1)
             roll = self.rng.random()
             ref = t.one(t.banter) if roll < 0.12 else t.one(t.chatty) if roll < 0.3 else t.one(t.refs)
-            self.pay(r, self.when(d, 0.08), self.rng.lognormvariate(3.3, 0.7), ref,
-                     reverse=self.rng.random() < 0.45)
+            ts = self.when(d, 0.08)
+            self.pay(r, ts, self.rng.lognormvariate(3.3, 0.7), ref, reverse=self.rng.random() < 0.45)
+            if self.rng.random() < 0.004:          # fell out: one of them hides the other's messages
+                self.hides.append((ts + timedelta(hours=1), r.recipient, r.sender))
 
     def couple(self):
         r, t = self.rel("couple_or_family", 0), self.text
@@ -228,8 +259,11 @@ class Builder:
         r, t = self.rel("debt_reminder", 0), self.text
         d = self.rng.uniform(0, 60)
         for _ in range(self.rng.randint(2, 5)):
-            self.pay(r, self.when(d, 0.05), self.micro(), t.one(t.firm))
+            ts = self.when(d, 0.05)
+            self.pay(r, ts, self.micro(), t.one(t.firm))
             d += self.rng.uniform(5, 20)
+        if self.rng.random() < 0.15:               # tired of reminders: hides them (an innocent hide)
+            self.hides.append((ts + timedelta(hours=2), r.recipient, r.sender))
         if self.rng.random() < 0.7:
             self.pay(r, self.when(min(d, DAYS - 1)), self.rng.uniform(100, 400), "paid back sorry", reverse=True)
 
@@ -260,8 +294,11 @@ class Builder:
         return t.one(t.refs) if self.rng.random() < 0.5 else ""
 
     def _campaign(self, r: Relationship, d0: float, n: int, harm: float, micro_p: float, night: float,
-                  replies: float, hide_p: float, split_threats: int = 0):
-        d, length = d0, self.rng.uniform(7, 60)
+                  replies: float, hide_p: float, split_threats: int = 0, span: tuple = (7, 60),
+                  stop_after_hide: bool = False) -> datetime | None:
+        """Returns when the recipient hid this sender, or None if they never did."""
+        d, length = d0, self.rng.uniform(*span)
+        hidden_at = None
         times = sorted(d0 + length * (self.rng.random() ** 0.7) for _ in range(n))  # denser later: escalation
         hide_after = int(n * self.rng.uniform(0.2, 0.6)) if self.rng.random() < hide_p else None
         splits_at = set(self.rng.sample(range(n), k=min(split_threats, n)))
@@ -283,9 +320,13 @@ class Builder:
                 self.pay(r, ts + timedelta(hours=self.rng.uniform(0.2, 6)), 0.01,
                          self.rng.choice(["please stop", "leave me alone", "stop", "?"]), reverse=True)
             if hide_after is not None and i == hide_after:
-                self.hides.append((ts + timedelta(minutes=30), r.recipient, r.sender))
+                hidden_at = ts + timedelta(minutes=30)
+                self.hides.append((hidden_at, r.recipient, r.sender))
+                if stop_after_hide:
+                    break
         first = [x.ts for x in self.txs if x.rel_id == r.rel_id and x.sender == r.sender]
         r.first_abuse = min(first) if first else None
+        return hidden_at
 
     def harassment(self):
         r = self.rel("harassment", 1)
@@ -318,11 +359,32 @@ class Builder:
         self._campaign(r, self.rng.uniform(0, 60), self.rng.randint(3, 6), harm=0.3, micro_p=0.4,
                        night=0.15, replies=0.1, hide_p=0.2)
 
+    def account_switch(self):
+        """Hidden by the victim, the abuser carries on from other accounts: a new one, or a friend's.
+
+        Each new account starts a relationship with no history, so a model that
+        scores sender -> recipient pairs on their own sees a stranger every time.
+        """
+        first = self.rel("account_switch_first", 1)
+        hidden = self._campaign(first, self.rng.uniform(0, 50), self.rng.randint(6, 25), harm=0.35, micro_p=0.75,
+                                night=0.35, replies=0.15, hide_p=1.0, stop_after_hide=self.rng.random() < 0.7)
+        victim = first.recipient
+        for _ in range(self.rng.randint(1, 3)):
+            if hidden is None:
+                break
+            start = (hidden - START).total_seconds() / 86400 + self.rng.uniform(0.1, 4)
+            if start >= DAYS - 2:
+                break
+            sender = self.person() if self.rng.random() < 0.6 else self.party(avoid=victim)
+            r = self.rel("account_switch", 1, sender=sender, recipient=victim)
+            hidden = self._campaign(r, start, self.rng.randint(3, 12), harm=0.3, micro_p=0.75, night=0.35,
+                                    replies=0.05, hide_p=0.5, span=(2, 20), stop_after_hide=True)
+
 
 INNOCENT = [("friends", 0.30), ("couple", 0.16), ("allowance", 0.08), ("rent", 0.10), ("child_support", 0.08),
             ("debt_reminder", 0.06), ("verification", 0.07), ("night_worker", 0.05), ("marketplace", 0.10)]
-ABUSIVE = [("harassment", 0.35), ("split_threat", 0.2), ("coercive_control", 0.2), ("abusive_support", 0.1),
-           ("low_and_slow", 0.15)]
+ABUSIVE = [("harassment", 0.31), ("split_threat", 0.18), ("coercive_control", 0.18), ("abusive_support", 0.09),
+           ("low_and_slow", 0.13), ("account_switch", 0.11)]
 
 
 def build(split: str, n_innocent: int, n_abusive: int, seed: int) -> World:

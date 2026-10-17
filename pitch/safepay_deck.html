@@ -1,0 +1,580 @@
+<title>SafePay Pitch Deck</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: 16:9 slides that scale as a unit (all sizes in --u = 1% of slide width);
+   statement-ledger details (mono rows, dotted rules) carry the payments subject. One deliberate light look. */
+:root {
+  --paper: #F6F7F9;      /* slide */
+  --desk: #E4E8EE;       /* behind slides on screen */
+  --card: #FFFFFF;
+  --ink: #0F1B2D;
+  --muted: #56627A;
+  --rule: #D6DCE6;
+  --accent: #1D5BD6;     /* SafePay / IBM blue */
+  --accent-tint: #E6EEFB;
+  --alert: #B5322A;      /* abuse */
+  --alert-tint: #FBEAE8;
+  --safe: #1B7146;       /* delivered, protected */
+  --safe-tint: #E2F0E8;
+  --base: #9AA4B5;       /* comparison baseline */
+  --zone: #ECF0F6;       /* platform boundary in the diagram */
+  --display: "IBM Plex Sans Condensed", "Arial Narrow", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", Consolas, ui-monospace, monospace;
+  color-scheme: light;
+}
+* { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { background: var(--desk); color: var(--ink); font-family: var(--body); margin: 0;
+       padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+       padding-block: 24px; }
+.deck { display: flex; flex-direction: column; align-items: center; gap: 24px; }
+.slide { width: min(100%, 1280px); aspect-ratio: 16 / 9; background: var(--paper); container-type: inline-size;
+         position: relative; overflow: hidden; box-shadow: 0 1px 3px rgba(15, 27, 45, .14), 0 8px 24px rgba(15, 27, 45, .06); }
+.in { --u: 1cqw; position: absolute; inset: 0; display: flex; flex-direction: column;
+      padding: calc(var(--u) * 3.6) calc(var(--u) * 4.6) calc(var(--u) * 2.4);
+      font-size: calc(var(--u) * 1.42); line-height: 1.42; }
+.eyebrow { font: 600 calc(var(--u) * 1.02) / 1 var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--accent); }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+h2 { font-weight: 600; font-size: calc(var(--u) * 3.35); line-height: 1.08; letter-spacing: -.01em;
+     margin: calc(var(--u) * .7) 0 calc(var(--u) * 1.8); max-width: 26ch; }
+h3 { font-weight: 600; font-size: calc(var(--u) * 1.75); line-height: 1.15; margin-bottom: calc(var(--u) * .5); }
+p { margin: 0; }
+.muted { color: var(--muted); }
+.mono { font-family: var(--mono); }
+.small { font-size: calc(var(--u) * 1.12); }
+.tiny { font-size: calc(var(--u) * .95); }
+.foot { margin-top: auto; display: flex; justify-content: space-between; gap: calc(var(--u) * 2);
+        padding-top: calc(var(--u) * 1); border-top: 1px solid var(--rule);
+        font: calc(var(--u) * .92) / 1.2 var(--mono); color: var(--muted); }
+.body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: calc(var(--u) * 1.6); }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 3); }
+.cols3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(var(--u) * 2); }
+.cols > *, .cols3 > * { min-width: 0; }
+ul.list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: calc(var(--u) * .9); }
+ul.list li { padding-left: calc(var(--u) * 1.6); position: relative; }
+ul.list li::before { content: ""; position: absolute; left: 0; top: .62em; width: calc(var(--u) * .7); height: 2px; background: var(--accent); }
+b { font-weight: 600; }
+.card { background: var(--card); border: 1px solid var(--rule); border-radius: calc(var(--u) * .5); padding: calc(var(--u) * 1.5) calc(var(--u) * 1.7); }
+.big { font: 600 calc(var(--u) * 4.4) / 1 var(--display); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.big.mid { font-size: calc(var(--u) * 3.2); }
+.big .unit { font-size: .5em; font-weight: 500; margin-left: .15em; }
+.tag { display: inline-block; font: 600 calc(var(--u) * .82) / 1 var(--mono); letter-spacing: .06em; text-transform: uppercase;
+       padding: calc(var(--u) * .35) calc(var(--u) * .55); border-radius: calc(var(--u) * .3); }
+.tag.alert { background: var(--alert-tint); color: var(--alert); }
+.tag.safe { background: var(--safe-tint); color: var(--safe); }
+.tag.accent { background: var(--accent-tint); color: var(--accent); }
+.src { font-size: calc(var(--u) * .9); color: var(--muted); }
+
+/* Statement ledger */
+.ledger { background: var(--card); border: 1px solid var(--rule); border-radius: calc(var(--u) * .5); font-family: var(--mono);
+          font-size: calc(var(--u) * 1.12); overflow: hidden; }
+.ledger .hd { display: flex; justify-content: space-between; padding: calc(var(--u) * .9) calc(var(--u) * 1.3);
+              border-bottom: 1px solid var(--rule); color: var(--muted); font-size: calc(var(--u) * .95); }
+.ledger .row { display: grid; grid-template-columns: 9ch 7ch 1fr auto; gap: calc(var(--u) * 1); align-items: center;
+               padding: calc(var(--u) * .42) calc(var(--u) * 1.3); border-bottom: 1px dotted var(--rule); }
+.ledger .row .amt { color: var(--safe); text-align: right; }
+.ledger .row .msg { color: var(--alert); }
+.ledger .ft { padding: calc(var(--u) * .9) calc(var(--u) * 1.3); background: var(--alert-tint); color: var(--ink); font-family: var(--body);
+              font-size: calc(var(--u) * 1.2); }
+.ledger .ft b { color: var(--alert); }
+
+/* Flow diagram */
+.flow { display: flex; align-items: stretch; gap: calc(var(--u) * .7); }
+.node { flex: 1; background: var(--card); border: 1px solid var(--rule); border-radius: calc(var(--u) * .45);
+        padding: calc(var(--u) * 1) calc(var(--u) * 1.1); font-size: calc(var(--u) * 1.1); line-height: 1.3; min-width: 0; }
+.node b { display: block; font-family: var(--display); font-size: calc(var(--u) * 1.32); margin-bottom: calc(var(--u) * .3); }
+.node.key { border-color: var(--accent); background: var(--accent-tint); }
+.arrow { align-self: center; color: var(--accent); font-size: calc(var(--u) * 1.6); flex: none; }
+.outs { display: grid; grid-template-columns: repeat(4, 1fr); gap: calc(var(--u) * .9); }
+.out { border-radius: calc(var(--u) * .45); padding: calc(var(--u) * 1) calc(var(--u) * 1.1); font-size: calc(var(--u) * 1.1); }
+.out b { display: block; font-family: var(--display); font-size: calc(var(--u) * 1.32); }
+.out.safe { background: var(--safe-tint); } .out.safe b { color: var(--safe); }
+.out.alert { background: var(--alert-tint); } .out.alert b { color: var(--alert); }
+.out.accent { background: var(--accent-tint); } .out.accent b { color: var(--accent); }
+.out.plain { background: var(--card); border: 1px solid var(--rule); }
+
+/* Bars (drawn to scale: width = value / scale max) */
+.bars { display: flex; flex-direction: column; gap: calc(var(--u) * .7); }
+.bar { display: grid; grid-template-columns: 13ch 1fr 7ch; gap: calc(var(--u) * 1); align-items: center; font-size: calc(var(--u) * 1.12); }
+.bar .track { height: calc(var(--u) * 1.1); background: transparent; position: relative; }
+.bar .fill { position: absolute; inset: 0 auto 0 0; border-radius: 0 calc(var(--u) * .3) calc(var(--u) * .3) 0; }
+.bar .fill.a { background: var(--accent); } .bar .fill.b { background: var(--base); }
+.bar .v { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.pair { display: grid; grid-template-columns: 22ch 1fr; gap: calc(var(--u) * 1.2); align-items: center;
+        padding: calc(var(--u) * .45) 0; border-bottom: 1px dotted var(--rule); font-size: calc(var(--u) * 1.12); }
+.pair .stack { display: flex; flex-direction: column; gap: calc(var(--u) * .3); }
+.pair .ln { display: grid; grid-template-columns: 1fr 5ch; gap: calc(var(--u) * .8); align-items: center; }
+.pair .t { height: calc(var(--u) * .8); position: relative; }
+.pair .v { font-family: var(--mono); font-size: calc(var(--u) * 1); text-align: right; }
+.legend { display: flex; gap: calc(var(--u) * 2); font-size: calc(var(--u) * 1.02); color: var(--muted); }
+.legend i { display: inline-block; width: calc(var(--u) * 1.1); height: calc(var(--u) * .7); border-radius: 2px; margin-right: calc(var(--u) * .5); vertical-align: middle; }
+
+/* Stat tiles */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: calc(var(--u) * 1.6); }
+.stat { border-top: 2px solid var(--ink); padding-top: calc(var(--u) * .9); }
+.stat .lbl { font-size: calc(var(--u) * 1.05); color: var(--muted); margin-top: calc(var(--u) * .5); }
+.vs { color: var(--muted); font-size: calc(var(--u) * 1.05); margin-top: calc(var(--u) * .3); }
+
+/* Title slide */
+.title-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: calc(var(--u) * 4); flex: 1; min-height: 0; align-items: center; }
+.title-grid > * { min-width: 0; }
+.wordmark { font: 700 calc(var(--u) * 8.4) / .9 var(--display); letter-spacing: -.03em; }
+.wordmark span { color: var(--accent); }
+.claim { font: 600 calc(var(--u) * 2.5) / 1.12 var(--display); margin-top: calc(var(--u) * 2); max-width: 24ch; text-wrap: balance; }
+.verify { display: flex; flex-direction: column; gap: calc(var(--u) * .6); font-size: calc(var(--u) * 1.1); }
+.verify div { border-radius: calc(var(--u) * .4); padding: calc(var(--u) * .7) calc(var(--u) * 1); }
+.verify .ok { background: var(--safe-tint); color: var(--safe); }
+.verify .no { background: var(--alert-tint); color: var(--alert); }
+
+table.t2 { border-collapse: collapse; width: 100%; font-size: calc(var(--u) * 1.1); }
+table.t2 th, table.t2 td { text-align: left; padding: calc(var(--u) * .5) calc(var(--u) * .7); border-bottom: 1px solid var(--rule); vertical-align: top; }
+table.t2 th { font-weight: 500; color: var(--muted); }
+
+
+/* Architecture diagram (same classes as pitch/architecture.html) */
+.dg { display: block; width: 100%; height: auto;  }
+.dg text { font-family: var(--body); font-size: 12px; fill: var(--ink); }
+.dg .t { font-family: var(--display); font-weight: 600; font-size: 14.5px; }
+.dg .m { fill: var(--muted); font-size: 11.5px; }
+.dg .lab { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+.dg .lab.hot { fill: var(--accent); }
+.dg .zone { fill: var(--zone); stroke: var(--ink); stroke-width: 1.2; }
+.dg .bx { fill: var(--card); stroke: var(--rule); stroke-width: 1.2; }
+.dg .bx.hot { stroke: var(--accent); stroke-width: 1.8; }
+.dg .bx.ext { fill: var(--paper); stroke: var(--ink); stroke-width: 1.2; }
+.dg .ln { fill: none; stroke: var(--ink); stroke-width: 1.4; }
+.dg .ln.hot { stroke: var(--accent); stroke-width: 2.2; }
+.dg .ln.dash { stroke: var(--muted); stroke-dasharray: 5 4; }
+.dg .ah-a { fill: var(--accent); } .dg .ah-i { fill: var(--ink); } .dg .ah-m { fill: var(--muted); }
+.arch { margin: 0; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: calc(var(--u) * .6); }
+.arch svg { flex: 1; min-height: 0; width: 100%; }
+.arch figcaption { font-size: calc(var(--u) * 1.02); color: var(--muted); }
+.cols.body, .cols3.body { align-content: start; flex: none; }
+
+/* Phone: drop the 16:9 box and let slides grow, so nothing is unreadably small */
+@media screen and (max-width: 720px) {
+  .slide { aspect-ratio: auto; }
+  .in { --u: 8.6px; position: relative; inset: auto; padding: 22px 18px 16px; }
+  .cols, .cols3, .title-grid, .stats, .outs { grid-template-columns: 1fr; }
+  .flow { flex-direction: column; }
+  .arrow { transform: rotate(90deg); }
+  .foot { flex-direction: column; gap: 4px; margin-top: 18px; }
+  .bar { grid-template-columns: 10ch 1fr 6ch; }
+  .pair { grid-template-columns: 1fr; }
+  .arch { overflow-x: auto; }
+  .arch svg { min-width: 760px; }
+}
+/* #s3 in the address shows just that slide */
+body:has(.slide:target) .slide:not(:target) { display: none; }
+@page { size: 13.333in 7.5in; margin: 0; }
+@media print {
+  body { background: var(--paper); padding: 0; }
+  .deck { display: block; }
+  .slide { width: 13.333in; height: 7.5in; aspect-ratio: auto; box-shadow: none; break-after: page; }
+  .slide:last-child { break-after: auto; }
+}
+</style>
+
+<div class="deck">
+
+<!-- 1 · Title -->
+<section class="slide" id="s1"><div class="in">
+  <div class="eyebrow">IBM Z Datathon 2026 · Theme 1: Real-Time AI for Critical Decisions · SSF2026</div>
+  <div class="title-grid">
+    <div>
+      <div class="wordmark">Safe<span>Pay</span></div>
+      <p class="claim">The money gets through. The abuse doesn't.</p>
+      <p class="muted" style="margin-top:calc(var(--u)*1.6);max-width:44ch">Real-time detection of abuse hidden in payment messages, with a signed record the victim can take to court. Built and measured on an IBM z17.</p>
+    </div>
+    <div class="ledger" aria-label="Nine one-cent payments that spell a threat">
+      <div class="hd"><span>Payments to Sam · 01:10–01:14</span><span>9 credits</span></div>
+      <div class="row"><span>01:10:00</span><span class="amt">+$0.01</span><span class="msg">I</span><span class="tag alert">withheld</span></div>
+      <div class="row"><span>01:10:30</span><span class="amt">+$0.01</span><span class="msg">am</span><span class="tag alert">withheld</span></div>
+      <div class="row"><span>01:11:00</span><span class="amt">+$0.01</span><span class="msg">going</span><span class="tag alert">withheld</span></div>
+      <div class="row"><span>01:11:30</span><span class="amt">+$0.01</span><span class="msg">to</span><span class="tag alert">withheld</span></div>
+      <div class="row"><span>01:12:00</span><span class="amt">+$0.01</span><span class="msg">find</span><span class="tag alert">withheld</span></div>
+      <div class="row"><span>01:12:30</span><span class="amt">+$0.01</span><span class="msg">you</span><span class="tag alert">withheld</span></div>
+      <div class="row"><span>01:13:00</span><span class="amt">+$0.01</span><span class="msg">and</span><span class="tag alert">withheld</span></div>
+      <div class="row"><span>01:13:30</span><span class="amt">+$0.01</span><span class="msg">kill</span><span class="tag alert">withheld</span></div>
+      <div class="row"><span>01:14:00</span><span class="amt">+$0.01</span><span class="msg">you</span><span class="tag alert">withheld</span></div>
+      <div class="ft">Read together: <b>“I am going to find you and kill you.”</b> Threat 1.00 · case P1 · money delivered · screened in milliseconds</div>
+    </div>
+  </div>
+  <div class="foot"><span>Suhas Adiga · individual entry</span><span>github.com/suhasadiga06/IBMZ</span><span>1 / 13</span></div>
+</div></section>
+
+<!-- 2 · Problem -->
+<section class="slide" id="s2"><div class="in">
+  <div class="eyebrow">The problem</div>
+  <h2>You can block a number. You can't block a bank transfer.</h2>
+  <div class="body">
+    <p style="max-width:66ch">When someone escapes an abuser, they block them on every app. But anyone with their account number can send one cent with a 140-character message attached, and it lands in their banking app, often at night.</p>
+    <div class="cols3">
+      <div class="card"><div class="big mid">≈1,500</div><p style="margin-top:calc(var(--u)*.8)"><b>high-risk cases a year</b> at Commonwealth Bank of Australia, which built a model to find them and gave it to other banks for free.</p></div>
+      <div class="card"><div class="big mid">24,000</div><p style="margin-top:calc(var(--u)*.8)"><b>payments blocked</b> by Westpac over abusive wording, sent by 19,000 customers.</p></div>
+      <div class="card"><div class="big mid">1 → 9</div><p style="margin-top:calc(var(--u)*.8)"><b>one threat, nine transfers.</b> Santander described a death threat split across payments so no single message tripped a filter.</p></div>
+    </div>
+  </div>
+  <p class="src">Sources: Commonwealth Bank newsroom (2023) and arXiv 2303.08016; Westpac via BankingDay; Santander via the Financial Times and Today's Family Lawyer.</p>
+  <div class="foot"><span>SafePay</span><span>2 / 13</span></div>
+</div></section>
+
+<!-- 3 · Why fixes fall short -->
+<section class="slide" id="s3"><div class="in">
+  <div class="eyebrow">Why today's fixes fall short</div>
+  <h2>Banks block words and score monthly. Abusers adapt in minutes.</h2>
+  <div class="cols body">
+    <div class="card"><h3>Word lists are easy to evade</h3><p><span class="mono">k.i.l.l</span> · <span class="mono">d3ad</span> · look-alike letters <span class="mono">уоu</span> · 🔪 · or one word per payment. Santander said banned words "are not known to stop senders".</p></div>
+    <div class="card"><h3>Monthly scoring is slow</h3><p>Commonwealth Bank's open-source model scores each relationship once a month. Re-implemented on my test world, it took a median of <b>19 days</b> to flag abuse.</p></div>
+    <div class="card"><h3>Menace can be polite</h3><p>“Saw you at the gym today” scores <b>0.02</b> on a toxicity model. The danger is in the pattern: penny payments at night, never answered, after being blocked.</p></div>
+    <div class="card"><h3>Blocking money hurts victims</h3><p>The payment may be child support or rent she depends on. The message is the harm, not the money.</p></div>
+  </div>
+  <div class="foot"><span>SafePay</span><span>3 / 13</span></div>
+</div></section>
+
+<!-- 4 · How it works -->
+<section class="slide" id="s4"><div class="in">
+  <div class="eyebrow">How SafePay works</div>
+  <h2 style="max-width:none">One decision per payment, inline, on one IBM z17.</h2>
+  <div class="body">
+    <figure class="arch"><svg class="dg" viewBox="0 0 1240 560" role="img" aria-label="SafePay architecture. Every payment, as ISO 20022 pacs.008 or pain.001, passes inline through parsing, pseudonymisation, the message model, the relationship model and policy on one IBM z17, then goes on to the recipient with the money delivered and the message shown or withheld. Cases, IBM Granite and signed evidence packs sit off the payment path. Data leaves only as the forwarded payment or a consented, signed pack.">
+  <defs>
+    <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="ah-a" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="ai" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-i" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="am" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-m" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+
+  <!-- Platform boundary -->
+  <rect class="zone" x="196" y="30" width="828" height="520" rx="10"/>
+  <text class="t" x="216" y="56">IBM LinuxONE · z17 (s390x) · SafePay service</text>
+  <text class="m" x="216" y="74">No external AI API. Data leaves only as the forwarded payment or a consented, signed pack.</text>
+
+  <!-- Outside: senders -->
+  <rect class="bx ext" x="20" y="96" width="150" height="50" rx="6"/>
+  <text class="t" x="95" y="117" text-anchor="middle">Sender's bank</text>
+  <text class="m" x="95" y="134" text-anchor="middle">banking app</text>
+  <rect class="bx ext" x="20" y="196" width="150" height="56" rx="6"/>
+  <text class="t" x="95" y="219" text-anchor="middle">Payment network</text>
+  <text class="m" x="95" y="237" text-anchor="middle">interbank pacs.008</text>
+
+  <!-- Hot path: every payment, inline -->
+  <text class="lab hot" x="535" y="182">every payment, inline · median 0.27 ms · p99 5.9 ms</text>
+  <rect class="bx hot" x="225" y="192" width="135" height="64" rx="6"/>
+  <text class="t" x="292.5" y="214" text-anchor="middle">Parse</text>
+  <text x="292.5" y="231" text-anchor="middle">ISO 20022</text>
+  <text class="m" x="292.5" y="246" text-anchor="middle">pacs.008 · pain.001</text>
+  <rect class="bx hot" x="380" y="192" width="135" height="64" rx="6"/>
+  <text class="t" x="447.5" y="214" text-anchor="middle">Pseudonymise</text>
+  <text x="447.5" y="231" text-anchor="middle">HMAC tokens</text>
+  <text class="m" x="447.5" y="246" text-anchor="middle">for every account</text>
+  <rect class="bx hot" x="535" y="192" width="135" height="64" rx="6"/>
+  <text class="t" x="602.5" y="214" text-anchor="middle">Message model</text>
+  <text x="602.5" y="231" text-anchor="middle">harm · threat</text>
+  <text class="m" x="602.5" y="246" text-anchor="middle">+ joined recent</text>
+  <rect class="bx hot" x="690" y="192" width="135" height="64" rx="6"/>
+  <text class="t" x="757.5" y="214" text-anchor="middle">Relationship</text>
+  <text x="757.5" y="231" text-anchor="middle">Snap ML forest</text>
+  <text class="m" x="757.5" y="246" text-anchor="middle">CPU, or AI unit</text>
+  <rect class="bx hot" x="845" y="192" width="135" height="64" rx="6"/>
+  <text class="t" x="912.5" y="214" text-anchor="middle">Policy</text>
+  <text x="912.5" y="231" text-anchor="middle">deliver · withhold</text>
+  <text class="m" x="912.5" y="246" text-anchor="middle">open case</text>
+
+  <line class="ln hot" x1="170" y1="224" x2="222" y2="224" marker-end="url(#aa)"/>
+  <polyline class="ln hot" points="170,116 292,116 292,189" marker-end="url(#aa)"/>
+  <text class="lab hot" x="204" y="108">pain.001 · before send</text>
+  <line class="ln hot" x1="361" y1="224" x2="377" y2="224" marker-end="url(#aa)"/>
+  <line class="ln hot" x1="516" y1="224" x2="532" y2="224" marker-end="url(#aa)"/>
+  <line class="ln hot" x1="671" y1="224" x2="687" y2="224" marker-end="url(#aa)"/>
+  <line class="ln hot" x1="826" y1="224" x2="842" y2="224" marker-end="url(#aa)"/>
+  <line class="ln hot" x1="981" y1="224" x2="1057" y2="224" marker-end="url(#aa)"/>
+
+  <!-- Outside: recipient -->
+  <rect class="bx ext" x="1060" y="192" width="160" height="64" rx="6"/>
+  <text class="t" x="1140" y="213" text-anchor="middle">Recipient's app</text>
+  <text class="m" x="1140" y="230" text-anchor="middle">money: always delivered</text>
+  <text class="m" x="1140" y="245" text-anchor="middle">message: shown or withheld</text>
+
+  <!-- Relationship state -->
+  <rect class="bx" x="545" y="290" width="255" height="50" rx="6"/>
+  <text class="t" x="672.5" y="311" text-anchor="middle">Relationship state</text>
+  <text class="m" x="672.5" y="329" text-anchor="middle">encrypted · last 20 messages · O(1) update</text>
+  <line class="ln" x1="757" y1="260" x2="757" y2="287" marker-start="url(#ai)" marker-end="url(#ai)"/>
+  <text class="lab" x="765" y="278">features</text>
+  <line class="ln" x1="602" y1="287" x2="602" y2="260" marker-end="url(#ai)"/>
+  <text class="lab" x="610" y="278">recent messages</text>
+
+  <!-- Case path -->
+  <line class="ln hot" x1="912" y1="258" x2="912" y2="361" marker-end="url(#aa)"/>
+  <text class="lab hot" x="920" y="300">open case</text>
+  <text class="lab hot" x="920" y="315">+ evidence</text>
+  <rect class="bx" x="845" y="364" width="135" height="68" rx="6"/>
+  <text class="t" x="912.5" y="386" text-anchor="middle">Case store</text>
+  <text x="912.5" y="403" text-anchor="middle">hash-chained</text>
+  <text class="m" x="912.5" y="419" text-anchor="middle">AES-256-GCM</text>
+
+  <!-- Victim's choices flow back in -->
+  <polyline class="ln dash" points="1200,258 1200,346 950,346 950,361" marker-end="url(#am)"/>
+  <text class="lab" x="1192" y="339" text-anchor="end">prefs · consent · hide</text>
+
+  <!-- Specialist team -->
+  <line class="ln" x1="981" y1="398" x2="1057" y2="398" marker-end="url(#ai)"/>
+  <rect class="bx ext" x="1060" y="364" width="160" height="68" rx="6"/>
+  <text class="t" x="1140" y="386" text-anchor="middle">Specialist team</text>
+  <text x="1140" y="403" text-anchor="middle">analyst console</text>
+  <text class="m" x="1140" y="419" text-anchor="middle">every view audited</text>
+
+  <!-- Granite, off the path -->
+  <rect class="bx" x="545" y="370" width="255" height="62" rx="6"/>
+  <text class="t" x="672.5" y="392" text-anchor="middle">IBM Granite 3.3 2B</text>
+  <text x="672.5" y="409" text-anchor="middle">llama.cpp · background queue</text>
+  <text class="m" x="672.5" y="424" text-anchor="middle">never on the payment path</text>
+  <line class="ln dash" x1="843" y1="386" x2="804" y2="386" marker-end="url(#am)"/>
+  <text class="lab" x="823" y="379" text-anchor="middle">facts</text>
+  <line class="ln dash" x1="802" y1="416" x2="841" y2="416" marker-end="url(#am)"/>
+  <text class="lab" x="823" y="430" text-anchor="middle">brief</text>
+
+  <!-- Keys -->
+  <rect class="bx" x="225" y="370" width="290" height="62" rx="6"/>
+  <text class="t" x="370" y="392" text-anchor="middle">Keys</text>
+  <text x="370" y="409" text-anchor="middle">HMAC · AES-256-GCM · Ed25519</text>
+  <text class="m" x="370" y="424" text-anchor="middle">production: IBM Crypto Express HSM</text>
+
+  <!-- Evidence pack -->
+  <line class="ln" x1="912" y1="432" x2="912" y2="459" marker-end="url(#ai)"/>
+  <text class="lab" x="920" y="450">with consent</text>
+  <rect class="bx" x="845" y="462" width="135" height="50" rx="6"/>
+  <text class="t" x="912.5" y="483" text-anchor="middle">Evidence pack</text>
+  <text class="m" x="912.5" y="500" text-anchor="middle">SHA-256 · Ed25519</text>
+  <line class="ln" x1="981" y1="487" x2="1057" y2="487" marker-end="url(#ai)"/>
+  <rect class="bx ext" x="1060" y="457" width="160" height="60" rx="6"/>
+  <text class="t" x="1140" y="479" text-anchor="middle">Police · court</text>
+  <text class="m" x="1140" y="497" text-anchor="middle">verify with public key</text>
+
+  <!-- Legend: the three line styles repeat across the figure -->
+  <line class="ln hot" x1="225" y1="482" x2="257" y2="482"/>
+  <text x="266" y="486">every payment, inline</text>
+  <line class="ln" x1="225" y1="504" x2="257" y2="504"/>
+  <text x="266" y="508">on demand</text>
+  <line class="ln dash" x1="225" y1="526" x2="257" y2="526"/>
+  <text x="266" y="530">background, or the customer's choice</text>
+</svg><figcaption>Blue: every payment, inline. Money always reaches the recipient; only the message can be withheld. Data leaves the z17 only as the forwarded payment or a consented, signed pack.</figcaption></figure>
+  </div>
+  <div class="foot"><span>SafePay</span><span>4 / 13</span></div>
+</div></section>
+
+<!-- 5 · Detection -->
+<section class="slide" id="s5"><div class="in">
+  <div class="eyebrow">Detection</div>
+  <h2>Three layers, because each one alone misses something.</h2>
+  <div class="cols3 body">
+    <div class="card"><h3>1 · Message model</h3><p class="small">Harm and threat heads trained on 260,000 real comments. Undoes evasion tricks first, recovering 95% of the recall they remove. Identity terms are masked so “gay” or “muslim” isn't read as abuse.</p>
+      <p class="mono small" style="margin-top:calc(var(--u)*1)">“…worthless b1tch” → <b style="color:var(--alert)">harm 1.00</b></p></div>
+    <div class="card"><h3>2 · Split messages</h3><p class="small">Joins the sender's references from the last 30 minutes and scores the sentence they form. Words under four letters are judged only in context.</p>
+      <p class="mono small" style="margin-top:calc(var(--u)*1)">9 words, each ≈ 0.0 → <b style="color:var(--alert)">threat 1.00</b></p></div>
+    <div class="card"><h3>3 · Relationship model</h3><p class="small">23 features kept per sender→recipient pair and updated in O(1): penny payments, night share, replies, bursts, an escalation detector, contact after being hidden.</p>
+      <p class="mono small" style="margin-top:calc(var(--u)*1)">“saw you at the gym” 0.02 → <b style="color:var(--alert)">pattern 1.00</b></p></div>
+  </div>
+  <p class="small"><span class="tag accent">IBM Granite 3.3</span>&nbsp; runs locally on the z17: a brief for analysts, and an independent second opinion that never sees the model's score. It stays advisory (slide 10).</p>
+  <div class="foot"><span>SafePay</span><span>5 / 13</span></div>
+</div></section>
+
+<!-- 6 · Protect and Prove -->
+<section class="slide" id="s6"><div class="in">
+  <div class="eyebrow">The victim's side</div>
+  <h2>Protect her now. Help her prove it later.</h2>
+  <div class="cols body">
+    <div class="card">
+      <h3>Protect</h3>
+      <ul class="list small">
+        <li>A neutral <b>“Message settings”</b> tab: how the bank may contact her, at what times, and whether someone else sees her phone. Encrypted.</li>
+        <li><b>Quick exit:</b> one tap swaps the screen for an ordinary account view.</li>
+        <li><b>Protect after hide:</b> for 14 days, brand-new senders are hidden by default, so an abuser who switches account is withheld from his first message.</li>
+        <li>Support lines (1800RESPECT, 000) and a confidential in-app line.</li>
+        <li>Analysts see her safe-contact rules first, before anything else.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Prove</h3>
+      <ul class="list small">
+        <li>With her consent, per sender and purpose (police, protection order, legal advice), and withdrawable.</li>
+        <li>A <b>signed evidence pack</b>: every payment from the first message, including those before the case opened. Facts come from the log, not AI.</li>
+        <li>SHA-256 hash-chained evidence log, and an Ed25519 signature anyone can check.</li>
+      </ul>
+      <div class="verify" style="margin-top:calc(var(--u)*1.2)">
+        <div class="ok mono">This record: VALID. Signed by the bank, log intact.</div>
+        <div class="no mono">Copy with one full stop added: NOT VALID.</div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>SafePay</span><span>6 / 13</span></div>
+</div></section>
+
+<!-- 7 · Results -->
+<section class="slide" id="s7"><div class="in">
+  <div class="eyebrow">Results · real-time vs monthly batch</div>
+  <h2>Nearly as many caught, and over two weeks sooner.</h2>
+  <div class="body">
+    <div class="stats">
+      <div class="stat"><div class="big">3.3<span class="unit">days</span></div><div class="lbl">median time from first abusive payment to a case</div><div class="vs">monthly batch: 19.3 days</div></div>
+      <div class="stat"><div class="big">92.0<span class="unit">%</span></div><div class="lbl">of abusive messages withheld as they arrived</div><div class="vs">monthly batch: 0% (it acts after the month)</div></div>
+      <div class="stat"><div class="big">452<span class="unit">/ 481</span></div><div class="lbl">abusive relationships caught</div><div class="vs">monthly batch: 465 / 481</div></div>
+      <div class="stat"><div class="big">0</div><div class="lbl">false alarms in 6,390 innocent relationships</div><div class="vs">monthly batch: 2</div></div>
+    </div>
+    <div class="bars" aria-label="Median days to case, drawn to scale">
+      <div class="tiny muted">Median days from the first abusive payment to a case (bars to scale)</div>
+      <div class="bar"><span>SafePay</span><span class="track"><span class="fill a" style="width:17.1%"></span></span><span class="v">3.3 d</span></div>
+      <div class="bar"><span>Monthly batch</span><span class="track"><span class="fill b" style="width:100%"></span></span><span class="v">19.3 d</span></div>
+    </div>
+    <p class="muted small">Held-out test world: 6,871 relationships, 44,426 payments, real Civil Comments test-split text, never used for any decision. Weak spot: abusive child-support payers, paid fortnightly or monthly, take a median of 58 days to reach a case. Zero false alarms here reflects a synthetic world; the next slide tests it at scale.</p>
+  </div>
+  <div class="foot"><span>SafePay</span><span>7 / 13</span></div>
+</div></section>
+
+<!-- Stress test -->
+<section class="slide" id="s8"><div class="in">
+  <div class="eyebrow">Stress test · I made my own world harder</div>
+  <h2>Harder data exposed two weaknesses. One fix was the model, one was policy.</h2>
+  <div class="cols3 body">
+    <div class="card"><h3>Realistic people</h3><p class="small">People now share relationships, and innocent people hide senders too. The previous model had learned <b>“a hide means abuse”</b> and flagged friends who fell out over “groceries split”: 9–12 false alarms per 4,800 innocent.</p>
+      <p class="mono small" style="margin-top:calc(var(--u)*1)">Retrained → <b style="color:var(--safe)">0 false alarms</b></p></div>
+    <div class="card"><h3>Account switching</h3><p class="small">Hidden by the victim, the abuser returns from a new account or a friend's. Caught 84% in 40 hours, but 28% of his messages got through first. Teaching the model about the recipient's side didn't help.</p>
+      <p class="small" style="margin-top:calc(var(--u)*1)"><b>Protect after hide:</b> 14 days of default hiding for new senders → <b style="color:var(--safe)">99% withheld</b>, 0.3% of innocent relationships see a soft hide.</p></div>
+    <div class="card"><h3>A realistic share of abusers</h3><p class="small">In tests 7% of relationships are abusive. Real banking is far rarer, so I replayed 305,163 innocent relationships, 1.7 million payments.</p>
+      <p class="mono small" style="margin-top:calc(var(--u)*1)">15 false alarms · 0.49 per 10,000</p>
+      <p class="small muted" style="margin-top:calc(var(--u)*.6)">If 1 in 1,000 relationships were abusive, 95% of cases would be real; at 1 in 10,000, 66%. A false alarm costs a human review and a soft hide, never a blocked payment.</p></div>
+  </div>
+  <div class="foot"><span>SafePay</span><span>8 / 13</span></div>
+</div></section>
+
+<!-- 8 · Outside check -->
+<section class="slide" id="s9"><div class="in">
+  <div class="eyebrow">Outside check · Commonwealth Bank's production model</div>
+  <h2>A model trained on real abuse recognises ours, and misses the quiet kinds.</h2>
+  <div class="cols body">
+    <div>
+      <p>CBA's open-source model was trained on real, expert-labelled cases and never saw my data. On my simulated world it scores <b>ROC AUC 0.87–0.94 per month</b>, against 0.80 on real data.</p>
+      <ul class="list small" style="margin-top:calc(var(--u)*1.2)">
+        <li>My synthetic abuse looks like real abuse to it.</li>
+        <li>My world is easier than reality, so I don't claim real-world precision.</li>
+        <li>SafePay was trained on this simulator and CBA's model wasn't. Part of SafePay's lead is home advantage. (Run on the previous simulator and model.)</li>
+      </ul>
+    </div>
+    <div>
+      <div class="legend" style="margin-bottom:calc(var(--u)*.8)"><span><i style="background:var(--accent)"></i>SafePay</span><span><i style="background:var(--base)"></i>CBA model</span></div>
+      <div class="tiny muted" style="margin-bottom:calc(var(--u)*.4)">Share of each type in the model's top 400 (0–100%)</div>
+      <div class="pair"><span>Harassment</span><span class="stack"><span class="ln"><span class="t"><span style="position:absolute;inset:0 auto 0 0;width:100%;background:var(--accent);border-radius:0 3px 3px 0"></span></span><span class="v">100%</span></span><span class="ln"><span class="t"><span style="position:absolute;inset:0 auto 0 0;width:99.2%;background:var(--base);border-radius:0 3px 3px 0"></span></span><span class="v">99%</span></span></span></div>
+      <div class="pair"><span>Split threats</span><span class="stack"><span class="ln"><span class="t"><span style="position:absolute;inset:0 auto 0 0;width:100%;background:var(--accent);border-radius:0 3px 3px 0"></span></span><span class="v">100%</span></span><span class="ln"><span class="t"><span style="position:absolute;inset:0 auto 0 0;width:94.9%;background:var(--base);border-radius:0 3px 3px 0"></span></span><span class="v">95%</span></span></span></div>
+      <div class="pair"><span>Coercive control</span><span class="stack"><span class="ln"><span class="t"><span style="position:absolute;inset:0 auto 0 0;width:100%;background:var(--accent);border-radius:0 3px 3px 0"></span></span><span class="v">100%</span></span><span class="ln"><span class="t"><span style="position:absolute;inset:0 auto 0 0;width:68.8%;background:var(--base);border-radius:0 3px 3px 0"></span></span><span class="v">69%</span></span></span></div>
+      <div class="pair"><span>Abusive child support</span><span class="stack"><span class="ln"><span class="t"><span style="position:absolute;inset:0 auto 0 0;width:95.3%;background:var(--accent);border-radius:0 3px 3px 0"></span></span><span class="v">95%</span></span><span class="ln"><span class="t"><span style="position:absolute;inset:0 auto 0 0;width:46.5%;background:var(--base);border-radius:0 3px 3px 0"></span></span><span class="v">47%</span></span></span></div>
+      <div class="pair"><span>Low and slow</span><span class="stack"><span class="ln"><span class="t"><span style="position:absolute;inset:0 auto 0 0;width:90.7%;background:var(--accent);border-radius:0 3px 3px 0"></span></span><span class="v">91%</span></span><span class="ln"><span class="t"><span style="position:absolute;inset:0 auto 0 0;width:27.8%;background:var(--base);border-radius:0 3px 3px 0"></span></span><span class="v">28%</span></span></span></div>
+    </div>
+  </div>
+  <div class="foot"><span>SafePay · github.com/h2oai/aitd (Apache-2.0)</span><span>9 / 13</span></div>
+</div></section>
+
+<!-- 9 · Responsible AI -->
+<section class="slide" id="s10"><div class="in">
+  <div class="eyebrow">Responsible AI</div>
+  <h2>I tested my own work, and kept the failures on record.</h2>
+  <div class="cols body">
+    <div class="card">
+      <h3>Fairness</h3>
+      <p class="small">My first model hid harmless messages just for naming a group. On Jigsaw's identity templates:</p>
+      <table class="t2" style="margin-top:calc(var(--u)*.6)">
+        <tr><th>Harmless sentence mentions</th><th>Before</th><th>After masking</th></tr>
+        <tr><td>“gay”</td><td>99.7%</td><td>13.2%</td></tr>
+        <tr><td>“black”</td><td>88.6%</td><td>13.2%</td></tr>
+        <tr><td>“muslim”</td><td>76.2%</td><td>13.2%</td></tr>
+      </table>
+      <p class="small muted" style="margin-top:calc(var(--u)*.6)">13.2% is now the rate for any template sentence. Toxic templates caught rose from 80.7% to 97.4%.</p>
+    </div>
+    <div class="card">
+      <h3>Honest evaluation</h3>
+      <ul class="list small">
+        <li>Version 1 memorised hand-written phrases (precision 70%). I split phrases three ways and report the final model on an untouched world.</li>
+        <li>Granite's second opinion was measured, not assumed: +5 caught for +1 false alarm on a fresh world, but +1 for +2 on another. So it advises and never decides.</li>
+        <li>I sped Granite up 5× to 11 s per opinion, by reading one token's probability instead of generating a sentence.</li>
+        <li>A harder world exposed a shortcut: the model had learned “a hide means abuse” and flagged friends who fell out: 9–12 false alarms per 4,800 innocent. Retrained: 0.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>SafePay</span><span>10 / 13</span></div>
+</div></section>
+
+<!-- 10 · Why IBM Z -->
+<section class="slide" id="s11"><div class="in">
+  <div class="eyebrow">Why IBM Z · measured on an IBM z17, machine type 9175</div>
+  <h2>Screen payments where they already run, without data leaving.</h2>
+  <div class="body">
+    <div class="stats">
+      <div class="stat"><div class="big mid">933<span class="unit">/s</span></div><div class="lbl">payments screened in one process, p99 5.9 ms</div></div>
+      <div class="stat"><div class="big mid">577<span class="unit">/s</span></div><div class="lbl">over HTTP with real ISO 20022 XML, p99 6.7 ms</div></div>
+      <div class="stat"><div class="big mid">11<span class="unit">µs</span></div><div class="lbl">relationship model on Snap ML, CPU engine</div></div>
+      <div class="stat"><div class="big mid">0</div><div class="lbl">external AI APIs. Granite runs locally, big-endian.</div></div>
+    </div>
+    <div class="cols">
+      <ul class="list small">
+        <li><b>On-chip AI accelerator, benchmarked honestly.</b> For this small forest, one payment at a time, Snap ML on the Telum AI unit took 61–97 µs against 11 µs on CPU, so I ship the CPU engine. In the lab container, the accelerator ran a dense network 11× faster than CPU at batch 2048.</li>
+        <li><b>Data stays on the platform.</b> AES-256-GCM on all stored message text, HMAC account tokens, and Ed25519-signed packs. In production the keys belong in Crypto Express HSMs.</li>
+      </ul>
+      <ul class="list small">
+        <li><b>Native s390x stack.</b> Ubuntu's numpy, SciPy and scikit-learn, IBM Snap ML and zDNN, llama.cpp for z16. Packaged as a Podman container.</li>
+        <li><b>Portability findings.</b> H2O's model scorer misreads trees on big-endian (feature 33 read as 8448), and GCC 13 can't target the z17. Both are documented for banks moving models onto Z.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>SafePay</span><span>11 / 13</span></div>
+</div></section>
+
+<!-- 11 · Path to production -->
+<section class="slide" id="s12"><div class="in">
+  <div class="eyebrow">Scalability and feasibility</div>
+  <h2>Built on the payment standard banks already use.</h2>
+  <div class="cols body">
+    <div>
+      <ul class="list">
+        <li><b>Plugs into existing flows.</b> ISO 20022 in, decision and forwarded pacs.008 out, at either bank.</li>
+        <li><b>Scales out.</b> Each relationship's state is independent and updated in O(1), so traffic shards by sender across processes or LPARs.</li>
+        <li><b>Learns.</b> Analyst confirm/dismiss labels are already stored for retraining.</li>
+        <li><b>Next:</b> pilot on a bank's consented, pseudonymised logs; other languages via Granite; keys in HSMs; other rails such as UPI.</li>
+      </ul>
+    </div>
+    <div>
+      <table class="t2">
+        <tr><th>Real</th><th>Simulated, and why</th></tr>
+        <tr><td>ISO 20022 parsing and the rewritten message</td><td>The bank: no hackathon can connect to one</td></tr>
+        <tr><td>1.14 million real comments (Civil Comments, CC0)</td><td>Abusive relationship timelines: public data of real victims shouldn't exist</td></tr>
+        <tr><td>Models, Snap ML and Granite on the z17</td><td>Names and accounts</td></tr>
+        <tr><td>Whatever you type in the live demo</td><td></td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="foot"><span>SafePay</span><span>12 / 13</span></div>
+</div></section>
+
+<!-- 12 · Close -->
+<section class="slide" id="s13"><div class="in">
+  <div class="eyebrow">SafePay · IBM Z Datathon 2026 · SSF2026</div>
+  <div class="title-grid">
+    <div>
+      <div class="wordmark" style="font-size:calc(var(--u)*6)">Safe<span>Pay</span></div>
+      <p class="claim">The money gets through, the abuse doesn't, and the evidence does.</p>
+    </div>
+    <div class="card">
+      <table class="t2">
+        <tr><th>Code</th><td class="mono">github.com/suhasadiga06/IBMZ</td></tr>
+        <tr><th>Live demo</th><td>Sender, screening trace and recipient's app, side by side</td></tr>
+        <tr><th>Analyst console</th><td>Ranked cases, safe-contact rules, Granite brief, evidence packs</td></tr>
+        <tr><th>Evidence page</th><td>Every number in this deck, read live from the result files</td></tr>
+        <tr><th>Built by</th><td>Suhas Adiga, individual entry</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="foot"><span>Thank you</span><span>13 / 13</span></div>
+</div></section>
+
+</div>

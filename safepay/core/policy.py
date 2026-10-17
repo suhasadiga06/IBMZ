@@ -37,6 +37,16 @@ class Decision:
 
 
 MIN_EVIDENCE = 3   # payments before a case may open on behaviour alone
+# After a customer hides someone, a brand-new sender who has never been paid
+# back gets their messages hidden by default for this long (one tap to view).
+# An abuser who switches accounts is a stranger to the models for his first few
+# payments; this extends the victim's own choice to his next account.
+PROTECT_DAYS = 14
+
+
+def protect_after_hide(recipient_ctx: list[float], replies: int) -> bool:
+    hid_someone, days_since, _ = recipient_ctx
+    return hid_someone == 1.0 and days_since <= PROTECT_DAYS and replies == 0
 
 
 def content_flag(t: Thresholds, harm: float, threat: float, split_harm: float, split_threat: float) -> bool:
@@ -50,7 +60,7 @@ def opens_case(t: Thresholds, rel_score: float, n_payments: int, content: bool) 
 
 def decide(t: Thresholds, harm: float, threat: float, split_harm: float, split_threat: float,
            rel_score: float, under_review: bool, recipient_hid_sender: bool, presubmit: bool = False,
-           n_payments: int = MIN_EVIDENCE) -> Decision:
+           n_payments: int = MIN_EVIDENCE, new_sender_after_hide: bool = False) -> Decision:
     d = Decision()
     if threat >= t.threat:
         d.reasons.append(f"message reads as a threat ({threat:.2f})")
@@ -64,6 +74,8 @@ def decide(t: Thresholds, harm: float, threat: float, split_harm: float, split_t
         d.reasons.append(f"relationship pattern looks abusive ({rel_score:.2f})")
     if recipient_hid_sender:
         d.reasons.append("recipient chose to hide messages from this sender")
+    if new_sender_after_hide and not d.reasons:
+        d.reasons.append("new sender soon after the recipient hid someone else")
 
     message_bad = bool(d.reasons)
     if message_bad:

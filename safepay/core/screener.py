@@ -15,7 +15,7 @@ import numpy as np
 
 from . import iso20022
 from .engine import Engine, informative
-from .policy import Thresholds, decide
+from .policy import Thresholds, decide, protect_after_hide
 from .privacy import Privacy
 from .state import PairState
 from .store import Store
@@ -23,7 +23,7 @@ from .store import Store
 
 class Screener:
     def __init__(self, text, rel_bundle: dict, store: Store, privacy: Privacy, on_new_case=None, on_escalate=None):
-        self.engine = Engine(text, rel_bundle["model"])
+        self.engine = Engine.for_bundle(text, rel_bundle)
         self.t = Thresholds(harm=text.thresholds["harm"], threat=text.thresholds["threat"],
                             case=rel_bundle["threshold"])
         self.store, self.privacy = store, privacy
@@ -38,6 +38,7 @@ class Screener:
             self.engine.states[(row["sender"], row["recipient"])] = PairState.from_json(raw)
         for h in store.q("SELECT * FROM hides"):
             self.engine.hide(h["recipient"], h["sender"], h["ts"])
+        self.engine.index_recipients()
 
     # -- helpers -------------------------------------------------------------------
     def tokens(self, p: iso20022.Payment) -> tuple[str, str]:
@@ -52,7 +53,8 @@ class Screener:
         joined = tmp.split_text(ts, ref)
         sh, sth = self.engine.score_text(joined) if joined else (0.0, 0.0)
         tmp.update(ts, when.hour, amount, ref, harm, threat, sh, sth)
-        score = float(self.engine.rel.predict_proba(np.asarray([tmp.features(ts)], dtype=np.float32))[0, 1])
+        feats = self.engine.features(s, r, tmp, ts)
+        score = float(self.engine.rel.predict_proba(np.asarray([feats], dtype=np.float32))[0, 1])
         return harm, threat, joined, sh, sth, score, tmp
 
     def hide_sender(self, recipient_acct: str, sender_acct: str) -> None:
@@ -75,8 +77,9 @@ class Screener:
                                                         obs.split_threat, obs.rel_score, obs.state)
         t_models = time.perf_counter()
         hidden_by_recipient = bool(st.hidden_at) and p.created.timestamp() >= st.hidden_at
+        protect = protect_after_hide(self.engine.recipient_features(s, r, st.first_ts), st.n_reply)
         d = decide(self.t, harm, threat, sh, sth, score, case is not None, hidden_by_recipient, presubmit,
-                   n_payments=st.n_tx)
+                   n_payments=st.n_tx, new_sender_after_hide=protect)
 
         case_id = case["id"] if case else None
         new_case = False

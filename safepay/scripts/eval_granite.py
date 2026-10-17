@@ -47,7 +47,7 @@ def build_cases(controls: int, seed: int) -> tuple[list[dict], dict]:
     rel = joblib.load(ART / "rel.joblib")
     t = Thresholds(text.thresholds["harm"], text.thresholds["threat"], rel["threshold"])
     w = W.build("test", 4000, 400, seed=seed)
-    eng = Engine(text, rel["model"])
+    eng = Engine.for_bundle(text, rel)
     rep = replay(w, eng)
     flags = first_flags(rep["rows"], t)
     units: dict = {}

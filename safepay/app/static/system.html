@@ -93,6 +93,27 @@ async function main() {
       `and ${pct(msg.innocent_hidden_share)} of ${msg.innocent_messages.toLocaleString()} innocent ones. Money was delivered in every case. False-alarm bars are drawn at 5× scale.`, two));
   }
 
+  const PV = m.eval_prevalence, TP = m.eval_test_protect, BV = m.eval_before_switch_val, BT = m.eval_before_switch_test, PO = m.metrics_rel_paironly;
+  if (PV && TP) {
+    const t = PV.totals, ev = TP.evaluation, a = ev.messages, b = ev.messages_without_protect_after_hide;
+    const ci = PV.false_alarm_rate_95ci.map(x => (x * 10000).toFixed(2));
+    const rows = [
+      ["Previous model on worlds with realistic people (validation and seed-9 worlds)", BV && BT ? `${BV.totals.false_alarms} and ${BT.totals.false_alarms} false alarms` : "–", "learned “a hide means abuse”"],
+      ["Retrained, test world", `${ev.false_alarms} false alarms in ${ev.innocent_relationships.toLocaleString()}`, ""],
+      ["Switched accounts caught", pct(ev.flag_rate_by_kind.account_switch), `median ${hrs(ev.delay_hours_median_by_kind.account_switch)}` + (PO ? ` (without recipient signals: ${pct(PO.safepay_realtime.flag_rate_by_kind.account_switch)})` : "")],
+      ["Switched-account messages withheld", `${pct(b.abusive_hidden_share_by_kind.account_switch)} → ${pct(a.abusive_hidden_share_by_kind.account_switch)}`, "model only → with protect-after-hide"],
+      ["Innocent relationships touched by protect-after-hide", `${TP.totals.innocent_relationships_protect_hidden} of ${TP.totals.innocent.toLocaleString()}`, "soft hide only"],
+    ];
+    const prev = Object.entries(PV.precision_at_prevalence).map(([k, v]) => [k + " relationships abusive", pct(v.measured), pct(v.worst_case_95)]);
+    const two = el("div", null, "two"); const l = el("div"), r = el("div");
+    l.append(el("div", "Realistic people and account switching", "label"), table(["", "Result", ""], rows));
+    r.append(el("div", `Realistic share of abusers: ${t.innocent.toLocaleString()} innocent relationships, ${t.payments.toLocaleString()} payments`, "label"),
+      el("p", `${t.false_alarms} false alarms: ${(PV.false_alarm_rate * 10000).toFixed(2)} per 10,000 (95% interval ${ci[0]}–${ci[1]}).`, "lede"),
+      table(["If this share is abusive", "Cases that are real abuse", "Worst case (95%)"], prev, [1, 2]));
+    two.append(l, r);
+    root.append(section("Stress test: we made our own world harder", "People share relationships, innocent people hide senders too, abusers switch accounts after being hidden, and the share of abusers is checked at a realistic level. Scored with the final model and policy.", two));
+  }
+
   const GE = m.granite_eval_v2_seed7;
   if (GE) {
     const hist = [["v1 prompt", "development (seed 6)", m.granite_eval_v1_seed6], ["v2 prompt", "development (seed 6)", m.granite_eval_v2_seed6],

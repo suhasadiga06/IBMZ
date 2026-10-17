@@ -1,46 +1,46 @@
 {
   "world": {
-    "relationships": 3300,
-    "payments": 33514
+    "relationships": 3345,
+    "payments": 33431
   },
   "tree_formats": {
     "compress_trees": {
       "reported": "compress_trees",
-      "single_us": 12.0,
-      "batch_us_per_row": 1.533
+      "single_us": 11.28,
+      "batch_us_per_row": 0.931
     },
     "zdnn_tensors": {
       "reported": "zdnn_tensors",
-      "single_us": 97.69,
-      "batch_us_per_row": 5.137
+      "single_us": 97.23,
+      "batch_us_per_row": 5.992
     }
   },
   "fastest_tree_format": "compress_trees",
-  "service_tree_format": "zdnn_tensors",
+  "service_tree_format": "auto",
   "pipeline": {
-    "payments": 33514,
-    "seconds": 36.35,
-    "payments_per_second": 922.0,
+    "payments": 33431,
+    "seconds": 35.85,
+    "payments_per_second": 932.6,
     "latency_ms": {
-      "p50": 0.269,
-      "p95": 4.891,
-      "p99": 5.784,
-      "mean": 1.084
+      "p50": 0.265,
+      "p95": 4.846,
+      "p99": 5.945,
+      "mean": 1.072
     }
   },
   "http": {
     "requests": 2000,
-    "requests_per_second": 614.8,
+    "requests_per_second": 576.8,
     "latency_ms": {
-      "p50": 0.72,
-      "p99": 5.91
+      "p50": 0.77,
+      "p99": 6.68
     }
   },
   "granite": {
     "model": "granite-3.3-2b-instruct Q4_K_M (big-endian GGUF)",
-    "seconds_per_brief": 220.2,
-    "prompt_tokens_per_second": 3.78,
-    "generate_tokens_per_second": 0.41,
+    "seconds_per_brief": 227.6,
+    "prompt_tokens_per_second": 7.4,
+    "generate_tokens_per_second": 0.37,
     "generated_tokens": 80
   },
   "notes": "Single process, no batching across payments. Snap ML tree inference is microseconds either way; the message model and SQLite write dominate."

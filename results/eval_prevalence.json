@@ -1,0 +1,59 @@
+{
+  "tag": "prevalence",
+  "model": "rel.joblib",
+  "model_features": 26,
+  "seed": 101,
+  "chunks": 8,
+  "totals": {
+    "relationships": 305163,
+    "payments": 1703849,
+    "abusive": 0,
+    "caught": 0,
+    "innocent": 305163,
+    "false_alarms": 15,
+    "innocent_messages": 1616263,
+    "innocent_hidden": 47962,
+    "innocent_hidden_without_protect": 47133,
+    "abusive_messages": 0,
+    "abusive_hidden": 0,
+    "innocent_relationships_protect_hidden": 462
+  },
+  "false_alarm_rate": 4.915405865062278e-05,
+  "false_alarm_rate_95ci": [
+    2.7511406130300646e-05,
+    8.107085079433026e-05
+  ],
+  "innocent_messages_hidden_share": 0.029674625973619393,
+  "false_alarms_by_kind": {
+    "friends": 12,
+    "debt_reminder": 2,
+    "couple_or_family": 1
+  },
+  "flag_rate_by_kind": {
+    "account_verification": 0.0,
+    "child_support": 0.0,
+    "couple_or_family": 0.0,
+    "debt_reminder": 0.0001,
+    "friends": 0.0001,
+    "marketplace": 0.0,
+    "night_shift_friends": 0.0,
+    "parent_allowance": 0.0,
+    "rent": 0.0
+  },
+  "seconds": 863.0,
+  "recall_used": 0.9397,
+  "precision_at_prevalence": {
+    "1 in 100": {
+      "measured": 0.9948,
+      "worst_case_95": 0.9915
+    },
+    "1 in 1,000": {
+      "measured": 0.9503,
+      "worst_case_95": 0.9207
+    },
+    "1 in 10,000": {
+      "measured": 0.6566,
+      "worst_case_95": 0.5369
+    }
+  }
+}

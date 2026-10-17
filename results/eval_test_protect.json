@@ -1,0 +1,144 @@
+{
+  "tag": "test_protect",
+  "model": "rel.joblib",
+  "model_features": 26,
+  "seed": 10,
+  "chunks": 1,
+  "totals": {
+    "relationships": 6871,
+    "payments": 44426,
+    "abusive": 481,
+    "caught": 452,
+    "innocent": 6390,
+    "false_alarms": 0,
+    "innocent_messages": 33223,
+    "innocent_hidden": 924,
+    "innocent_hidden_without_protect": 894,
+    "abusive_messages": 8344,
+    "abusive_hidden": 7673,
+    "innocent_relationships_protect_hidden": 17
+  },
+  "false_alarm_rate": 0.0,
+  "false_alarm_rate_95ci": [
+    0.0,
+    0.0005771228299563786
+  ],
+  "innocent_messages_hidden_share": 0.027812057911687685,
+  "false_alarms_by_kind": {},
+  "flag_rate_by_kind": {
+    "abusive_child_support": 0.9286,
+    "account_switch": 0.8395,
+    "account_switch_first": 0.9091,
+    "account_switch_first_reverse": 0.0,
+    "account_switch_reverse": 0.0,
+    "account_verification": 0.0,
+    "child_support": 0.0,
+    "coercive_control": 1.0,
+    "coercive_control_reverse": 0.0,
+    "couple_or_family": 0.0,
+    "debt_reminder": 0.0,
+    "friends": 0.0,
+    "harassment": 1.0,
+    "harassment_reverse": 0.0,
+    "low_and_slow": 0.8,
+    "low_and_slow_reverse": 0.0,
+    "marketplace": 0.0,
+    "night_shift_friends": 0.0,
+    "parent_allowance": 0.0,
+    "rent": 0.0,
+    "split_threat": 1.0,
+    "split_threat_reverse": 0.0
+  },
+  "seconds": 28.4,
+  "evaluation": {
+    "precision": 1.0,
+    "recall": 0.9397,
+    "f1": 0.9689,
+    "abusive_relationships": 481,
+    "caught": 452,
+    "innocent_relationships": 6390,
+    "false_alarms": 0,
+    "false_alarms_per_10k_innocent": 0.0,
+    "delay_hours_median": 79.2,
+    "delay_hours_p90": 482.4,
+    "caught_within_24h_share": 0.1809,
+    "flag_rate_by_kind": {
+      "abusive_child_support": 0.9286,
+      "account_switch": 0.8395,
+      "account_switch_first": 0.9091,
+      "account_switch_first_reverse": 0.0,
+      "account_switch_reverse": 0.0,
+      "account_verification": 0.0,
+      "child_support": 0.0,
+      "coercive_control": 1.0,
+      "coercive_control_reverse": 0.0,
+      "couple_or_family": 0.0,
+      "debt_reminder": 0.0,
+      "friends": 0.0,
+      "harassment": 1.0,
+      "harassment_reverse": 0.0,
+      "low_and_slow": 0.8,
+      "low_and_slow_reverse": 0.0,
+      "marketplace": 0.0,
+      "night_shift_friends": 0.0,
+      "parent_allowance": 0.0,
+      "rent": 0.0,
+      "split_threat": 1.0,
+      "split_threat_reverse": 0.0
+    },
+    "delay_hours_median_by_kind": {
+      "abusive_child_support": 1387.8,
+      "account_switch": 40.2,
+      "account_switch_first": 85.2,
+      "coercive_control": 95.5,
+      "harassment": 69.2,
+      "low_and_slow": 280.5,
+      "split_threat": 58.1
+    },
+    "messages": {
+      "abusive_messages": 8344,
+      "abusive_hidden_share": 0.9196,
+      "innocent_messages": 33223,
+      "innocent_hidden_share": 0.0278,
+      "abusive_hidden_share_by_kind": {
+        "abusive_child_support": 0.6387,
+        "account_switch": 0.9922,
+        "account_switch_first": 0.7895,
+        "coercive_control": 0.8907,
+        "harassment": 0.9569,
+        "low_and_slow": 0.5225,
+        "split_threat": 0.9308
+      }
+    },
+    "messages_without_protect_after_hide": {
+      "abusive_messages": 8344,
+      "abusive_hidden_share": 0.9063,
+      "innocent_messages": 33223,
+      "innocent_hidden_share": 0.0269,
+      "abusive_hidden_share_by_kind": {
+        "abusive_child_support": 0.6387,
+        "account_switch": 0.7206,
+        "account_switch_first": 0.7895,
+        "coercive_control": 0.888,
+        "harassment": 0.9559,
+        "low_and_slow": 0.5225,
+        "split_threat": 0.9308
+      }
+    }
+  },
+  "recall_used": 0.9397089397089398,
+  "precision_at_prevalence": {
+    "1 in 100": {
+      "measured": 1.0,
+      "worst_case_95": 0.9427
+    },
+    "1 in 1,000": {
+      "measured": 1.0,
+      "worst_case_95": 0.6198
+    },
+    "1 in 10,000": {
+      "measured": 1.0,
+      "worst_case_95": 0.14
+    }
+  }
+}

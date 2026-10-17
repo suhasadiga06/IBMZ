@@ -110,6 +110,24 @@ def test_engine_counts_replies_and_contact_after_hide():
     assert obs.state.n_reply == 1 and obs.state.n_after_hide == 1
 
 
+def test_new_account_after_a_hide_is_not_a_stranger():
+    eng = Engine(KeywordModel(), ConstRel(0.1))
+    eng.observe(T0, "abuser", "victim", 0.01, "answer me")
+    eng.hide("victim", "abuser", (T0 + timedelta(hours=1)).timestamp())
+    obs = eng.observe(T0 + timedelta(days=2), "new_account", "victim", 0.01, "you can't hide")
+    hid, gap_days, new_senders = obs.features[-3:]
+    assert hid == 1.0 and 1.9 < gap_days < 2.0 and new_senders == 1.0
+    # A sender who was already paying before the hide is not counted as new.
+    early = eng.observe(T0 + timedelta(days=3), "abuser", "victim", 0.01, "hello")
+    assert early.features[-3:] == [0.0, 60.0, 0.0]          # the hide was of this sender itself
+
+
+def test_pair_only_engine_matches_older_models():
+    eng = Engine(KeywordModel(), ConstRel(0.1), recipient_context=False)
+    from safepay.core.state import PAIR_FEATURES
+    assert len(eng.observe(T0, "a", "b", 5.0, "rent").features) == len(PAIR_FEATURES)
+
+
 def test_split_threat_detected_when_joined():
     eng = Engine(KeywordModel(), ConstRel(0.1))
     for i, w in enumerate(["I will", "find you", "and kill", "you"]):
@@ -229,6 +247,10 @@ def test_api_scenarios_end_to_end(api):
     assert all(s["case_id"] is None for s in friends)
     support = c.post("/demo/script/child_support").json()["steps"]
     assert all(s["decision"]["deliver_funds"] for s in support) and any(s["case_id"] for s in support)
+    # Hidden, the abuser switches account: the new account's very first message is withheld.
+    drew = [s for s in c.post("/demo/script/account_switch").json()["steps"] if s["sender"] == "Drew Kelly"]
+    assert drew[0]["decision"]["message"] == "HIDE"
+    assert any("new sender soon after" in r for r in drew[0]["decision"]["reasons"])
     xml = iso20022.build_pacs008(iso20022.new_payment("A", "1", "B", "2", 20.0, "rent"))
     r = c.post("/v1/screen", content=xml, headers={"Content-Type": "application/xml"}).json()["results"][0]
     assert r["decision"]["message"] == "SHOW" and "<Ustrd>rent</Ustrd>" in r["forwarded_pacs008"]
