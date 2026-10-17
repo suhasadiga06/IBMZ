@@ -59,21 +59,9 @@ def case_facts(case_id: int) -> tuple[dict, list[str]]:
     st = screener.engine.states.get((c["sender"], c["recipient"]))
     ev = store.evidence(case_id)
     msgs = [privacy.open(e["sealed_ref"], f"case:{case_id}") for e in ev]
-    days = (st.last_ts - st.first_ts) / 86400 if st else 0
-    facts = {
-        "payments_from_sender": st.n_tx if st else len(ev),
-        "total_sent": f"${st.amount_sum:,.2f}" if st else "n/a",
-        "over_days": round(days, 2),
-        "share_of_payments_under_one_dollar": f"{100 * st.n_micro / max(st.n_tx, 1):.0f}%" if st else "n/a",
-        "share_sent_between_midnight_and_5am": f"{100 * st.n_night / max(st.n_tx, 1):.0f}%" if st else "n/a",
-        "payments_back_from_recipient": st.n_reply if st else 0,
-        "messages_rated_abusive": st.n_harmful if st else 0,
-        "recipient_hid_this_sender": bool(st and st.hidden_at),
-        "payments_after_recipient_hid_sender": st.n_after_hide if st else 0,
-        "model_risk_score": round(c["score"], 2),
-        "model_reasons": "; ".join(json.loads(c["reasons"] or "[]")[:5]),
-    }
-    return facts, msgs
+    if st is None:
+        return {"payments_from_sender": len(ev)}, msgs
+    return granite.facts_from_state(st, c["score"], json.loads(c["reasons"] or "[]")), msgs
 
 
 def granite_job(case_id: int) -> None:
@@ -247,7 +235,8 @@ def system() -> dict:
 @app.get("/api/model-metrics")
 def model_metrics() -> dict:
     out = {}
-    for name in ("metrics_text", "metrics_text_unmasked", "metrics_rel", "benchmark", "cba_validation"):
+    for name in ("metrics_text", "metrics_text_unmasked", "metrics_rel", "benchmark", "cba_validation",
+                 "granite_eval_v1_seed6", "granite_eval_v2_seed6", "granite_eval_v2_seed7"):
         f = ART / f"{name}.json"
         out[name] = json.loads(f.read_text()) if f.exists() else None
     return out

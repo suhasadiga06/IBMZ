@@ -1,0 +1,14 @@
+{
+  "before": {
+    "brief_s": 96.7,
+    "opinion_s_typical": 60,
+    "note": "v1: 110-token brief, JSON opinion with a sentence"
+  },
+  "after": {
+    "brief_s": 66.9,
+    "brief_tokens": 80,
+    "opinion_s": 0.9,
+    "opinion_p": 0.996
+  },
+  "model": "granite-3.3-2b-instruct Q4_K_M big-endian, llama.cpp, 3 threads"
+}
