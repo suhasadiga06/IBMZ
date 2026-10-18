@@ -194,7 +194,7 @@ Then open http://localhost:8090 (live demo with five scenarios; the recipient's 
 
 Modes: `bash run_safepay.sh` (local demo), `public` (password-protected public demo on 0.0.0.0; port 8090 must be open in the VM firewall), `production` (no demo; API keys and analyst tokens required), `container` (after `podman build -t safepay -f Containerfile .`).
 
-Tests: `python3 -m pytest -q tests_safepay` (33 tests). They cover the hash chain catching edits and deletions, pack signatures rejecting a one-character change or another key, consent gating and withdrawal, the security controls above, and that no message text or preference is readable in the database.
+Tests: `python3 -m pytest -q tests_safepay` (36 tests). They cover the hash chain catching edits and deletions, pack signatures rejecting a one-character change or another key, consent gating and withdrawal, the security controls above, and that no message text or preference is readable in the database.
 
 ### API
 
