@@ -137,7 +137,6 @@ class Worker:
     def __init__(self, handler):
         self.q: queue.Queue = queue.Queue()
         self.handler = handler
-        self.done = 0
         self.last_error = ""
         self.pending: list[tuple] = []      # waiting or running, oldest first
         self.lock = threading.Lock()
@@ -162,7 +161,6 @@ class Worker:
             job = self.q.get()
             try:
                 self.handler(*job)
-                self.done += 1
             except Exception as e:  # keep the worker alive; record what went wrong
                 self.last_error = f"{type(e).__name__}: {e}"[:300]
                 time.sleep(1)

@@ -76,7 +76,7 @@ def granite_job(case_id: int) -> None:
     facts, msgs = case_facts(case_id)
     t0 = time.time()
     text, timings = granite.summary(facts, msgs)
-    opinion, t2 = granite.second_opinion(facts, msgs)
+    opinion, _ = granite.second_opinion(facts, msgs)
     took = time.time() - t0
     store.set_case(case_id, summary=text, summary_by=f"IBM Granite 3.3 2B · llama.cpp on {platform.machine()} · {took:.0f}s",
                    second_opinion=json.dumps(opinion))

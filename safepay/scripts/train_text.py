@@ -26,7 +26,6 @@ import pandas as pd
 from sklearn.metrics import (f1_score, precision_recall_curve, precision_score, recall_score,
                              roc_auc_score)
 
-from safepay.core.normalize import EMOJI_WORDS
 from safepay.core.textmodel import MessageModel
 
 ROOT = Path(__file__).resolve().parents[2]

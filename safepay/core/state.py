@@ -13,7 +13,6 @@ from __future__ import annotations
 import json
 import math
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
 
 SPLIT_WINDOW = 30 * 60        # seconds
 SPLIT_KEEP = 8
@@ -144,6 +143,3 @@ RECIPIENT_FEATURES = ["recipient_hid_another_sender", "days_from_that_hide_to_fi
 FEATURES = PAIR_FEATURES + RECIPIENT_FEATURES
 NO_HIDE_DAYS = 60.0
 
-
-def hour_of(dt: datetime) -> int:
-    return dt.hour
