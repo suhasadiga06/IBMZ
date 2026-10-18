@@ -2,10 +2,8 @@
 
 Two modes, chosen with SAFEPAY_MODE:
 
-  demo (default)  The demo pages and /demo endpoints are on. Locally nothing
-                  asks for a password. With a demo password set (for a public
-                  link), every page and API needs HTTP Basic auth as "judge",
-                  and stricter rate limits apply.
+  demo (default)  The demo pages and /demo endpoints are on, and nothing asks
+                  for a password. Run it on localhost (or behind an SSH tunnel).
   production      The demo pages and /demo endpoints are switched off (404).
                   Bank systems need an API key (X-API-Key), analysts need a
                   personal token (X-Analyst-Token), and the analyst's identity
@@ -19,7 +17,6 @@ Secrets live in files outside the repository (default ~/.safepay/), created by
 """
 from __future__ import annotations
 
-import base64
 import hmac
 import os
 import threading
@@ -29,10 +26,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from fastapi import HTTPException, Request
-from starlette.responses import JSONResponse, PlainTextResponse, Response
+from starlette.responses import JSONResponse, Response
 
 HOME = Path(os.environ.get("SAFEPAY_SECRETS_DIR", Path.home() / ".safepay"))
-OPEN_PATHS = ("/healthz", "/v1/packs/verify", "/v1/evidence/public-key")
 DEMO_PREFIXES = ("/demo/", "/analyst", "/system", "/pack/", "/static/")
 DEMO_EXACT = ("/", "/api/system", "/api/model-metrics")
 DEMO_ANALYST = "analyst-demo"
@@ -50,16 +46,11 @@ class Settings:
     mode: str = "demo"
     api_keys: list[str] = field(default_factory=list)
     analyst_tokens: dict[str, str] = field(default_factory=dict)   # token -> analyst name
-    demo_password: str | None = None
     max_body_bytes: int = 1_000_000
 
     @property
     def production(self) -> bool:
         return self.mode == "production"
-
-    @property
-    def public(self) -> bool:
-        return self.demo_password is not None and not self.production
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -68,12 +59,9 @@ class Settings:
             tok, _, name = line.partition(" ")
             if tok and name:
                 tokens[tok] = name.strip()
-        pw_file = Path(os.environ.get("SAFEPAY_DEMO_PASSWORD_FILE", HOME / "demo_password"))
-        pw = os.environ.get("SAFEPAY_DEMO_PASSWORD") or (_read(pw_file)[0] if os.environ.get("SAFEPAY_PUBLIC") == "1"
-                                                          and _read(pw_file) else None)
         return cls(mode=os.environ.get("SAFEPAY_MODE", "demo"),
                    api_keys=_read(Path(os.environ.get("SAFEPAY_API_KEYS_FILE", HOME / "api_keys"))),
-                   analyst_tokens=tokens, demo_password=pw)
+                   analyst_tokens=tokens)
 
 
 settings = Settings.from_env()
@@ -108,12 +96,12 @@ def analyst(request: Request) -> str:
 
 
 # -- rate limits ----------------------------------------------------------------------
-# (method or None for any, path prefix, requests, per seconds). First match wins; the public demo is stricter.
+# (method or None for any, path prefix, requests, per seconds). First match wins.
 # Only starting a background replay is expensive; the console polls its progress with GET.
 LIMITS = [("POST", "/demo/background", 1, 300), ("GET", "/demo/background", 120, 60), (None, "/demo/reset", 6, 60),
           (None, "/demo/script/", 20, 60), (None, "/demo/send", 30, 60), (None, "/v1/cases/", 60, 60),
           (None, "/v1/packs/verify", 30, 60), (None, "/v1/screen", 6000, 60)]
-PUBLIC_DEFAULT, PRIVATE_DEFAULT = (240, 60), (100_000, 60)
+DEFAULT_LIMIT = (100_000, 60)
 
 
 class RateLimiter:
@@ -121,15 +109,15 @@ class RateLimiter:
         self.hits: dict[tuple[str, str], deque] = defaultdict(deque)
         self.lock = threading.Lock()
 
-    def allow(self, client: str, path: str, public: bool, method: str = "GET") -> tuple[bool, int]:
+    def allow(self, client: str, path: str, method: str = "GET") -> tuple[bool, int]:
         rule = next(((m, p, n, s) for m, p, n, s in LIMITS if path.startswith(p) and m in (None, method)), None)
         if rule is None:
-            n, s = PUBLIC_DEFAULT if public else PRIVATE_DEFAULT
+            n, s = DEFAULT_LIMIT
             key = "*"
         else:
             m, p, n, s = rule
             key = p if m is None else f"{m} {p}"
-            if not public and not p.startswith("/demo/"):
+            if not p.startswith("/demo/"):
                 n *= 10
         now = time.monotonic()
         with self.lock:
@@ -160,16 +148,6 @@ SECURITY_HEADERS = {
 }
 
 
-def _basic_ok(header: str | None) -> bool:
-    if not header or not header.lower().startswith("basic "):
-        return False
-    try:
-        user, _, pw = base64.b64decode(header[6:]).decode().partition(":")
-    except Exception:
-        return False
-    return hmac.compare_digest(user.encode(), b"judge") and hmac.compare_digest(pw.encode(), settings.demo_password.encode())
-
-
 def is_demo_path(path: str) -> bool:
     return path in DEMO_EXACT or path.startswith(DEMO_PREFIXES)
 
@@ -179,18 +157,14 @@ async def middleware(request: Request, call_next) -> Response:
     # 1. Production: the demo does not exist.
     if settings.production and is_demo_path(path):
         return JSONResponse({"detail": "Not Found"}, status_code=404, headers=SECURITY_HEADERS)
-    # 2. Public demo: everything except the open paths needs the demo password.
-    if settings.public and path not in OPEN_PATHS and not _basic_ok(request.headers.get("authorization")):
-        return PlainTextResponse("SafePay demo: sign in with the user name and password from the submission.",
-                                 status_code=401, headers={"WWW-Authenticate": 'Basic realm="SafePay demo"', **SECURITY_HEADERS})
-    # 3. Body size, before anything reads the body.
+    # 2. Body size, before anything reads the body.
     try:
         if int(request.headers.get("content-length") or 0) > settings.max_body_bytes:
             return JSONResponse({"detail": "request too large"}, status_code=413, headers=SECURITY_HEADERS)
     except ValueError:
         return JSONResponse({"detail": "bad content-length"}, status_code=400, headers=SECURITY_HEADERS)
-    # 4. Rate limits per client address.
-    ok, retry = limiter.allow(request.client.host if request.client else "?", path, settings.public, request.method)
+    # 3. Rate limits per client address.
+    ok, retry = limiter.allow(request.client.host if request.client else "?", path, request.method)
     if not ok:
         return JSONResponse({"detail": "too many requests, slow down"}, status_code=429,
                             headers={"Retry-After": str(retry), **SECURITY_HEADERS})

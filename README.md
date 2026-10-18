@@ -4,7 +4,7 @@
 
 > Individual entry by Suhas Adiga. Submission title: `Suhas Adiga_IBM Z Datathon 2026 Project`
 
-**Judges: start with [JUDGES.md](JUDGES.md)**, which covers opening the live demo, a 5-minute walkthrough, and running SafePay on your own laptop.
+**Judges: start with [JUDGES.md](JUDGES.md)**, which covers running SafePay on your own laptop and a 5-minute walkthrough of the demo.
 
 ## The problem
 
@@ -159,13 +159,9 @@ Civil Comments test split, payment-length texts (≤ 140 characters):
 | Floods and expensive requests | Rate limits per client and route, and a cap of 4 queued Granite briefs; more are refused with 429 |
 | Clickjacking and content injection | Content Security Policy, `X-Frame-Options: DENY`, `nosniff`, `no-referrer`, no caching; API data is rendered with `textContent`, never as HTML |
 | Data at rest | AES-256-GCM for messages, relationship state and victim preferences; HMAC tokens for accounts; hash-chained evidence; Ed25519-signed packs |
-| Secrets | Keys, tokens and the demo password live in `~/.safepay/` (mode 600), outside the repository, created by `python3 -m safepay.scripts.make_keys`. Granite only listens on 127.0.0.1 |
+| Secrets | Keys and tokens live in `~/.safepay/` (mode 600), outside the repository, created by `python3 -m safepay.scripts.make_keys`. Granite only listens on 127.0.0.1 |
 
 Pack verification (`/v1/packs/verify`, `/v1/evidence/public-key`) stays open in every mode, so police and courts can check a pack without an account.
-
-## Live demo
-
-**http://148.100.99.226:8090** (user `judge`; the password is in the submission). The analyst console is at `/analyst` and the evidence page at `/system`. The demo holds only fictional data.
 
 ## What is real and what is simulated
 
@@ -173,7 +169,7 @@ Pack verification (`/v1/packs/verify`, `/v1/evidence/public-key`) stays open in 
 |---|---|
 | ISO 20022 pacs.008 / pain.001 parsing and the forwarded message | The bank itself: SafePay speaks the industry format instead |
 | Message text: 1.14M real short comments (Civil Comments, CC0) | **Abusive relationship timelines.** No public dataset of real abusive payments exists, and one shouldn't, because it would expose victims. Patterns follow what banks have published |
-| Live demo input: whatever you type is screened by the real service | Customer names and accounts (fictional) |
+| Demo input: whatever you type is screened by the real service | Customer names and accounts (fictional) |
 | Snap ML, zDNN, Granite and llama.cpp running on the z17 | Hand-written payment-style, banter, coercive and debt-reminder phrases, split in thirds across train/validation/test |
 
 ## Run it
@@ -192,9 +188,9 @@ From your laptop:
 ssh -N -L 8090:127.0.0.1:8090 linux1@<vm-ip>
 ```
 
-Then open http://localhost:8090 (live demo with five scenarios; the recipient's **Message settings** tab is the victim's side), `/analyst` (specialist console, with **Prepare signed evidence pack** for cases with consent), `/pack/{id}` (the printable pack, with Verify and Simulate tampering), and `/system` (every number above, read from the training and benchmark outputs).
+Then open http://localhost:8090 (the demo with five scenarios; the recipient's **Message settings** tab is the victim's side), `/analyst` (specialist console, with **Prepare signed evidence pack** for cases with consent), `/pack/{id}` (the printable pack, with Verify and Simulate tampering), and `/system` (every number above, read from the training and benchmark outputs).
 
-Modes: `bash run_safepay.sh` (local demo), `public` (password-protected public demo on 0.0.0.0; port 8090 must be open in the VM firewall), `production` (no demo; API keys and analyst tokens required), `container` (after `podman build -t safepay -f Containerfile .`).
+Modes: `bash run_safepay.sh` (demo on localhost), `production` (no demo; API keys and analyst tokens required), `container` (after `podman build -t safepay -f Containerfile .`).
 
 Tests: `python3 -m pytest -q tests_safepay` (36 tests). They cover the hash chain catching edits and deletions, pack signatures rejecting a one-character change or another key, consent gating and withdrawal, the security controls above, and that no message text or preference is readable in the database.
 

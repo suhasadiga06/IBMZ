@@ -319,18 +319,18 @@ def test_parser_refuses_dtds_entities_and_huge_messages(payload):
 def test_rate_limiter_counts_per_client_and_route():
     from safepay.app.security import RateLimiter
     rl = RateLimiter()
-    assert all(rl.allow("a", "/demo/reset", public=True)[0] for _ in range(6))
-    ok, retry = rl.allow("a", "/demo/reset", public=True)
+    assert all(rl.allow("a", "/demo/reset")[0] for _ in range(6))
+    ok, retry = rl.allow("a", "/demo/reset")
     assert not ok and retry > 0
-    assert rl.allow("b", "/demo/reset", public=True)[0]          # another client is unaffected
+    assert rl.allow("b", "/demo/reset")[0]          # another client is unaffected
 
 
 def test_background_replay_is_limited_but_its_progress_is_not():
     from safepay.app.security import RateLimiter
     rl = RateLimiter()
-    assert rl.allow("a", "/demo/background", public=False, method="POST")[0]
-    assert not rl.allow("a", "/demo/background", public=False, method="POST")[0]   # one replay per 5 minutes
-    assert all(rl.allow("a", "/demo/background", public=False, method="GET")[0] for _ in range(60))
+    assert rl.allow("a", "/demo/background", method="POST")[0]
+    assert not rl.allow("a", "/demo/background", method="POST")[0]   # one replay per 5 minutes
+    assert all(rl.allow("a", "/demo/background", method="GET")[0] for _ in range(60))
 
 
 def test_granite_worker_never_queues_the_same_case_twice():
@@ -388,18 +388,14 @@ def test_production_mode_locks_down_the_service(api, secure):
 
 
 @needs_models
-def test_public_demo_needs_the_password_and_sends_security_headers(api, secure):
-    secure.demo_password = "s3cret-demo"
-    r = api.get("/")
-    assert r.status_code == 401 and "Basic" in r.headers["www-authenticate"]
-    assert api.get("/", auth=("judge", "wrong")).status_code == 401
-    ok = api.get("/", auth=("judge", "s3cret-demo"))
+def test_demo_sends_security_headers_and_limits_resets(api):
+    ok = api.get("/")
     assert ok.status_code == 200 and ok.headers["x-frame-options"] == "DENY"
     assert "frame-ancestors 'none'" in ok.headers["content-security-policy"]
     assert api.get("/healthz").status_code == 200                      # health checks stay open
     for _ in range(6):
-        assert api.post("/demo/reset", auth=("judge", "s3cret-demo")).status_code == 200
-    assert api.post("/demo/reset", auth=("judge", "s3cret-demo")).status_code == 429
+        assert api.post("/demo/reset").status_code == 200
+    assert api.post("/demo/reset").status_code == 429
 
 
 @needs_models
