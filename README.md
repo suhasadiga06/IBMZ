@@ -4,6 +4,8 @@
 
 > Individual entry by Suhas Adiga. Submission title: `Suhas Adiga_IBM Z Datathon 2026 Project`
 
+**Judges: start with [JUDGES.md](JUDGES.md)**, which covers opening the live demo, a 5-minute walkthrough, and running SafePay on your own laptop.
+
 ## The problem
 
 When a victim blocks an abuser on their phone and every social app, some abusers find the one channel that can't be blocked: **the victim's bank account**. They send one-cent payments with threats in the payment reference.
